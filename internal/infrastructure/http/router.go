@@ -12,6 +12,7 @@ func NewRouter(
 	categoryHandler *handlers.CategoryHandler,
 	transactionHandler *handlers.TransactionHandler,
 	allocationHandler *handlers.AllocationHandler,
+	importHandler *handlers.ImportHandler,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -46,6 +47,10 @@ func NewRouter(
 	mux.HandleFunc("GET /api/transactions/{id}", transactionHandler.GetTransaction)
 	mux.HandleFunc("PUT /api/transactions/{id}", transactionHandler.UpdateTransaction)
 	mux.HandleFunc("DELETE /api/transactions/{id}", transactionHandler.DeleteTransaction)
+	mux.HandleFunc("POST /api/transactions/bulk-categorize", transactionHandler.BulkCategorizeTransactions)
+
+	// Import routes
+	mux.HandleFunc("POST /api/transactions/import", importHandler.ImportTransactions)
 
 	// Allocation routes
 	mux.HandleFunc("POST /api/allocations", allocationHandler.CreateAllocation)
