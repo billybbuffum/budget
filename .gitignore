@@ -48,3 +48,10 @@ static/styles.css
 
 # mcp settings
 .playwright-mcp/*.png
+
+# test data files
+.test-data/
+test-data/
+
+# mac osx files
+.DS_Store

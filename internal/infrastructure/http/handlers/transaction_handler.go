@@ -167,3 +167,28 @@ func (h *TransactionHandler) CreateTransfer(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(transaction)
 }
+
+type BulkCategorizeRequest struct {
+	TransactionIDs []string `json:"transaction_ids"`
+	CategoryID     *string  `json:"category_id,omitempty"`
+}
+
+func (h *TransactionHandler) BulkCategorizeTransactions(w http.ResponseWriter, r *http.Request) {
+	var req BulkCategorizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.TransactionIDs) == 0 {
+		http.Error(w, "transaction_ids is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.transactionService.BulkCategorizeTransactions(r.Context(), req.TransactionIDs, req.CategoryID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
