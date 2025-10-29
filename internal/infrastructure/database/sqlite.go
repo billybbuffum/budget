@@ -47,7 +47,6 @@ func initSchema(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS categories (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
-		type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
 		description TEXT,
 		color TEXT,
 		created_at DATETIME NOT NULL,
@@ -57,7 +56,7 @@ func initSchema(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS transactions (
 		id TEXT PRIMARY KEY,
 		account_id TEXT NOT NULL,
-		category_id TEXT NOT NULL,
+		category_id TEXT,
 		amount INTEGER NOT NULL,
 		description TEXT,
 		date DATETIME NOT NULL,

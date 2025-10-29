@@ -40,8 +40,9 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 		WHERE id = ?
 	`
 	transaction := &domain.Transaction{}
+	var categoryID sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
+		&transaction.ID, &transaction.AccountID, &categoryID,
 		&transaction.Amount, &transaction.Description, &transaction.Date,
 		&transaction.CreatedAt, &transaction.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -49,6 +50,9 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transaction: %w", err)
+	}
+	if categoryID.Valid {
+		transaction.CategoryID = &categoryID.String
 	}
 	return transaction, nil
 }
@@ -182,10 +186,14 @@ func (r *transactionRepository) scanTransactions(rows *sql.Rows) ([]*domain.Tran
 	var transactions []*domain.Transaction
 	for rows.Next() {
 		transaction := &domain.Transaction{}
-		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
+		var categoryID sql.NullString
+		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &categoryID,
 			&transaction.Amount, &transaction.Description, &transaction.Date,
 			&transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction: %w", err)
+		}
+		if categoryID.Valid {
+			transaction.CategoryID = &categoryID.String
 		}
 		transactions = append(transactions, transaction)
 	}

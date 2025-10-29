@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/billybbuffum/budget/internal/application"
-	"github.com/billybbuffum/budget/internal/domain"
 )
 
 type CategoryHandler struct {
@@ -18,14 +17,12 @@ func NewCategoryHandler(categoryService *application.CategoryService) *CategoryH
 
 type CreateCategoryRequest struct {
 	Name        string `json:"name"`
-	Type        string `json:"type"`        // income or expense
 	Description string `json:"description"`
 	Color       string `json:"color"`
 }
 
 type UpdateCategoryRequest struct {
 	Name        string `json:"name"`
-	Type        string `json:"type"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
 }
@@ -37,7 +34,7 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := h.categoryService.CreateCategory(r.Context(), req.Name, domain.CategoryType(req.Type), req.Description, req.Color)
+	category, err := h.categoryService.CreateCategory(r.Context(), req.Name, req.Description, req.Color)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -66,17 +63,7 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
-	categoryType := r.URL.Query().Get("type")
-
-	var categories []*domain.Category
-	var err error
-
-	if categoryType != "" {
-		categories, err = h.categoryService.ListCategoriesByType(r.Context(), domain.CategoryType(categoryType))
-	} else {
-		categories, err = h.categoryService.ListCategories(r.Context())
-	}
-
+	categories, err := h.categoryService.ListCategories(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -99,7 +86,7 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := h.categoryService.UpdateCategory(r.Context(), id, req.Name, domain.CategoryType(req.Type), req.Description, req.Color)
+	category, err := h.categoryService.UpdateCategory(r.Context(), id, req.Name, req.Description, req.Color)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -18,15 +18,15 @@ func NewTransactionHandler(transactionService *application.TransactionService) *
 
 type CreateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
-	CategoryID  string    `json:"category_id"`
-	Amount      int64     `json:"amount"`      // in cents (positive=inflow, negative=outflow)
+	CategoryID  *string   `json:"category_id,omitempty"` // Optional for income, required for expenses
+	Amount      int64     `json:"amount"`                // in cents (positive=inflow, negative=outflow)
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
 }
 
 type UpdateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
-	CategoryID  string    `json:"category_id"`
+	CategoryID  *string   `json:"category_id,omitempty"`
 	Amount      int64     `json:"amount"`
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
