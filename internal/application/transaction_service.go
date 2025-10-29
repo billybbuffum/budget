@@ -393,3 +393,24 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, id string) e
 
 	return nil
 }
+
+// ListUncategorizedTransactions returns all transactions that don't have a category assigned
+func (s *TransactionService) ListUncategorizedTransactions(ctx context.Context) ([]*domain.Transaction, error) {
+	return s.transactionRepo.ListUncategorized(ctx)
+}
+
+// BulkCategorizeTransactions assigns a category to multiple transactions at once
+func (s *TransactionService) BulkCategorizeTransactions(ctx context.Context, transactionIDs []string, categoryID *string) error {
+	if len(transactionIDs) == 0 {
+		return fmt.Errorf("no transaction IDs provided")
+	}
+
+	// Validate category exists if provided
+	if categoryID != nil && *categoryID != "" {
+		if _, err := s.categoryRepo.GetByID(ctx, *categoryID); err != nil {
+			return fmt.Errorf("category not found: %w", err)
+		}
+	}
+
+	return s.transactionRepo.BulkUpdateCategory(ctx, transactionIDs, categoryID)
+}
