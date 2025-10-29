@@ -8,6 +8,7 @@
 *.so
 *.dylib
 budget-server
+budget-app
 
 # Test binary, built with `go test -c`
 *.test
