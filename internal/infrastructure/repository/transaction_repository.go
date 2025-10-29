@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/billybbuffum/budget/internal/domain"
 )
@@ -19,11 +20,11 @@ func NewTransactionRepository(db *sql.DB) domain.TransactionRepository {
 
 func (r *transactionRepository) Create(ctx context.Context, transaction *domain.Transaction) error {
 	query := `
-		INSERT INTO transactions (id, user_id, category_id, amount, description, date, created_at, updated_at)
+		INSERT INTO transactions (id, account_id, category_id, amount, description, date, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		transaction.ID, transaction.UserID, transaction.CategoryID,
+		transaction.ID, transaction.AccountID, transaction.CategoryID,
 		transaction.Amount, transaction.Description, transaction.Date,
 		transaction.CreatedAt, transaction.UpdatedAt)
 	if err != nil {
@@ -34,13 +35,13 @@ func (r *transactionRepository) Create(ctx context.Context, transaction *domain.
 
 func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain.Transaction, error) {
 	query := `
-		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
 		WHERE id = ?
 	`
 	transaction := &domain.Transaction{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&transaction.ID, &transaction.UserID, &transaction.CategoryID,
+		&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
 		&transaction.Amount, &transaction.Description, &transaction.Date,
 		&transaction.CreatedAt, &transaction.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -54,7 +55,7 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 
 func (r *transactionRepository) List(ctx context.Context) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
 		ORDER BY date DESC
 	`
@@ -67,16 +68,16 @@ func (r *transactionRepository) List(ctx context.Context) ([]*domain.Transaction
 	return r.scanTransactions(rows)
 }
 
-func (r *transactionRepository) ListByUser(ctx context.Context, userID string) ([]*domain.Transaction, error) {
+func (r *transactionRepository) ListByAccount(ctx context.Context, accountID string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
-		WHERE user_id = ?
+		WHERE account_id = ?
 		ORDER BY date DESC
 	`
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, accountID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list transactions by user: %w", err)
+		return nil, fmt.Errorf("failed to list transactions by account: %w", err)
 	}
 	defer rows.Close()
 
@@ -85,7 +86,7 @@ func (r *transactionRepository) ListByUser(ctx context.Context, userID string) (
 
 func (r *transactionRepository) ListByCategory(ctx context.Context, categoryID string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
 		WHERE category_id = ?
 		ORDER BY date DESC
@@ -101,7 +102,7 @@ func (r *transactionRepository) ListByCategory(ctx context.Context, categoryID s
 
 func (r *transactionRepository) ListByPeriod(ctx context.Context, startDate, endDate string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
 		WHERE date >= ? AND date <= ?
 		ORDER BY date DESC
@@ -115,14 +116,38 @@ func (r *transactionRepository) ListByPeriod(ctx context.Context, startDate, end
 	return r.scanTransactions(rows)
 }
 
+func (r *transactionRepository) GetCategoryActivity(ctx context.Context, categoryID, period string) (int64, error) {
+	// Parse period to get date range (YYYY-MM format)
+	t, err := time.Parse("2006-01", period)
+	if err != nil {
+		return 0, fmt.Errorf("invalid period format: %w", err)
+	}
+
+	t = t.UTC()
+	startDate := t.Add(-time.Second).Format(time.RFC3339)
+	endDate := t.AddDate(0, 1, 0).Add(-time.Second).Format(time.RFC3339)
+
+	query := `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM transactions
+		WHERE category_id = ? AND date >= ? AND date <= ?
+	`
+	var activity int64
+	err = r.db.QueryRowContext(ctx, query, categoryID, startDate, endDate).Scan(&activity)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get category activity: %w", err)
+	}
+	return activity, nil
+}
+
 func (r *transactionRepository) Update(ctx context.Context, transaction *domain.Transaction) error {
 	query := `
 		UPDATE transactions
-		SET user_id = ?, category_id = ?, amount = ?, description = ?, date = ?, updated_at = ?
+		SET account_id = ?, category_id = ?, amount = ?, description = ?, date = ?, updated_at = ?
 		WHERE id = ?
 	`
 	result, err := r.db.ExecContext(ctx, query,
-		transaction.UserID, transaction.CategoryID, transaction.Amount,
+		transaction.AccountID, transaction.CategoryID, transaction.Amount,
 		transaction.Description, transaction.Date, transaction.UpdatedAt, transaction.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update transaction: %w", err)
@@ -157,7 +182,7 @@ func (r *transactionRepository) scanTransactions(rows *sql.Rows) ([]*domain.Tran
 	var transactions []*domain.Transaction
 	for rows.Next() {
 		transaction := &domain.Transaction{}
-		if err := rows.Scan(&transaction.ID, &transaction.UserID, &transaction.CategoryID,
+		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
 			&transaction.Amount, &transaction.Description, &transaction.Date,
 			&transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction: %w", err)
