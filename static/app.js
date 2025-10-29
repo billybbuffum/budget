@@ -34,6 +34,19 @@ function formatMonthYear() {
     });
 }
 
+// Show toast notification
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+
+    toastMessage.textContent = message;
+    toast.className = 'toast active ' + (type === 'error' ? 'bg-red-600' : 'bg-green-600');
+
+    setTimeout(() => {
+        toast.className = 'toast';
+    }, 3000);
+}
+
 // API functions
 async function apiCall(endpoint, options = {}) {
     try {
@@ -55,7 +68,7 @@ async function apiCall(endpoint, options = {}) {
         return text ? JSON.parse(text) : null;
     } catch (error) {
         console.error('API call failed:', error);
-        alert(`Error: ${error.message}`);
+        showToast(error.message, 'error');
         throw error;
     }
 }
@@ -102,8 +115,10 @@ function showView(viewName) {
     // Update navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
+        if (item.dataset.view === viewName) {
+            item.classList.add('active');
+        }
     });
-    event.target.classList.add('active');
 
     // Hide all views
     document.querySelectorAll('.view').forEach(view => {
@@ -149,7 +164,12 @@ async function loadBudgetView() {
         const expenseCategories = categories.filter(c => c.type === 'expense');
 
         if (expenseCategories.length === 0) {
-            budgetCategories.innerHTML = '<div class="text-gray-500 text-center py-8">No expense categories yet. Create one to get started!</div>';
+            budgetCategories.innerHTML = `
+                <div class="text-center py-12">
+                    <p class="text-gray-500 mb-4">No expense categories yet.</p>
+                    <button onclick="showView('categories')" class="btn-primary">Create Your First Category</button>
+                </div>
+            `;
             return;
         }
 
@@ -167,10 +187,10 @@ async function loadBudgetView() {
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 flex-1">
-                            <div class="w-3 h-3 rounded-full" style="background-color: ${category.color || '#3b82f6'}"></div>
+                            <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                             <div class="flex-1">
                                 <div class="font-semibold text-gray-800">${category.name}</div>
-                                <div class="text-sm text-gray-500">${category.description || ''}</div>
+                                ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
                             </div>
                         </div>
                         <div class="flex gap-6 items-center">
@@ -186,8 +206,8 @@ async function loadBudgetView() {
                                 <div class="text-xs text-gray-500">Available</div>
                                 <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                             </div>
-                            <button onclick="showAllocateModal('${category.id}', '${category.name}')" class="btn-primary text-sm">
-                                Allocate
+                            <button onclick="showAllocateModal('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})" class="btn-primary text-sm whitespace-nowrap">
+                                ${allocated > 0 ? 'Edit' : 'Allocate'}
                             </button>
                         </div>
                     </div>
@@ -212,7 +232,12 @@ async function loadAccountsView() {
         const accountsList = document.getElementById('accounts-list');
 
         if (accounts.length === 0) {
-            accountsList.innerHTML = '<div class="text-gray-500 text-center py-8">No accounts yet. Create one to get started!</div>';
+            accountsList.innerHTML = `
+                <div class="text-center py-12">
+                    <p class="text-gray-500 mb-4">No accounts yet. Create one to start tracking your money!</p>
+                    <button onclick="showAddAccountModal()" class="btn-primary">Create Your First Account</button>
+                </div>
+            `;
             return;
         }
 
@@ -247,7 +272,12 @@ async function loadTransactionsView() {
         const transactionsList = document.getElementById('transactions-list');
 
         if (transactions.length === 0) {
-            transactionsList.innerHTML = '<div class="text-gray-500 text-center py-8">No transactions yet. Add one to get started!</div>';
+            transactionsList.innerHTML = `
+                <div class="text-center py-12">
+                    <p class="text-gray-500 mb-4">No transactions yet.</p>
+                    <button onclick="showAddTransactionModal()" class="btn-primary">Add Your First Transaction</button>
+                </div>
+            `;
             return;
         }
 
@@ -260,13 +290,14 @@ async function loadTransactionsView() {
             const account = accounts.find(a => a.id === transaction.account_id);
             const category = categories.find(c => c.id === transaction.category_id);
             const amountClass = transaction.amount >= 0 ? 'text-green-600' : 'text-red-600';
+            const sign = transaction.amount >= 0 ? '+' : '';
 
             return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
-                                <div class="w-2 h-2 rounded-full" style="background-color: ${category?.color || '#gray'}"></div>
+                                ${category ? `<div class="w-2 h-2 rounded-full" style="background-color: ${category.color || '#gray'}"></div>` : ''}
                                 <div class="font-semibold text-gray-800">${transaction.description || 'Transaction'}</div>
                             </div>
                             <div class="text-sm text-gray-500 mt-1">
@@ -274,7 +305,7 @@ async function loadTransactionsView() {
                             </div>
                         </div>
                         <div class="text-right">
-                            <div class="text-xl font-bold ${amountClass}">${formatCurrency(Math.abs(transaction.amount))}</div>
+                            <div class="text-xl font-bold ${amountClass}">${sign}${formatCurrency(Math.abs(transaction.amount))}</div>
                         </div>
                     </div>
                 </div>
@@ -316,10 +347,10 @@ function renderCategoryCard(category) {
     return `
         <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div class="flex items-center gap-3">
-                <div class="w-4 h-4 rounded-full" style="background-color: ${category.color || '#3b82f6'}"></div>
+                <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                 <div class="flex-1">
                     <div class="font-semibold text-gray-800">${category.name}</div>
-                    <div class="text-sm text-gray-500">${category.description || 'No description'}</div>
+                    ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
                 </div>
             </div>
         </div>
@@ -341,7 +372,22 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-function showAddTransactionModal() {
+async function showAddTransactionModal() {
+    await loadAccounts();
+    await loadCategories();
+
+    if (accounts.length === 0) {
+        showToast('Please create an account first', 'error');
+        showView('accounts');
+        return;
+    }
+
+    if (categories.length === 0) {
+        showToast('Please create a category first', 'error');
+        showView('categories');
+        return;
+    }
+
     // Populate account and category dropdowns
     const accountSelect = document.getElementById('transaction-account');
     const categorySelect = document.getElementById('transaction-category');
@@ -353,147 +399,172 @@ function showAddTransactionModal() {
         categories.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
 
     // Set default date to today
-    document.getElementById('transaction-date').valueAsDate = new Date();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('transaction-date').value = today;
 
     showModal('transaction-modal');
 }
 
 function showAddAccountModal() {
+    document.getElementById('account-form').reset();
     showModal('account-modal');
 }
 
 function showAddCategoryModal() {
+    document.getElementById('category-form').reset();
     showModal('category-modal');
 }
 
-function showAllocateModal(categoryId, categoryName) {
+function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
     document.getElementById('allocation-category-id').value = categoryId;
     document.getElementById('allocation-category-name').textContent = categoryName;
+    document.getElementById('allocation-amount').value = (currentAmount / 100).toFixed(2);
+    document.getElementById('allocation-notes').value = '';
     showModal('allocation-modal');
 }
 
 // Form submissions
-document.getElementById('transaction-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+document.addEventListener('DOMContentLoaded', function() {
+    // Transaction form
+    document.getElementById('transaction-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    const accountId = document.getElementById('transaction-account').value;
-    const categoryId = document.getElementById('transaction-category').value;
-    const amount = parseFloat(document.getElementById('transaction-amount').value);
-    const type = document.getElementById('transaction-type').value;
-    const date = document.getElementById('transaction-date').value;
-    const description = document.getElementById('transaction-description').value;
+        const accountId = document.getElementById('transaction-account').value;
+        const categoryId = document.getElementById('transaction-category').value;
+        const amount = parseFloat(document.getElementById('transaction-amount').value);
+        const type = document.getElementById('transaction-type').value;
+        const date = document.getElementById('transaction-date').value;
+        const description = document.getElementById('transaction-description').value;
 
-    // Convert amount to cents, negative for outflow
-    const amountInCents = Math.round((type === 'outflow' ? -amount : amount) * 100);
+        if (!accountId || !categoryId) {
+            showToast('Please select account and category', 'error');
+            return;
+        }
 
-    try {
-        await apiCall('/transactions', {
-            method: 'POST',
-            body: JSON.stringify({
-                account_id: accountId,
-                category_id: categoryId,
-                amount: amountInCents,
-                description: description || 'Transaction',
-                date: new Date(date).toISOString()
-            })
-        });
+        // Convert amount to cents, negative for outflow
+        const amountInCents = Math.round((type === 'outflow' ? -amount : amount) * 100);
 
-        closeModal('transaction-modal');
-        document.getElementById('transaction-form').reset();
+        try {
+            await apiCall('/transactions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    account_id: accountId,
+                    category_id: categoryId,
+                    amount: amountInCents,
+                    description: description || 'Transaction',
+                    date: new Date(date).toISOString()
+                })
+            });
 
-        // Reload current view
-        const activeView = document.querySelector('.nav-item.active').textContent.toLowerCase().trim();
-        showView(activeView);
-    } catch (error) {
-        console.error('Failed to create transaction:', error);
-    }
-});
+            closeModal('transaction-modal');
+            document.getElementById('transaction-form').reset();
+            showToast('Transaction added successfully!');
 
-document.getElementById('account-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+            // Reload views
+            loadBudgetView();
+            loadAccountsView();
+            loadTransactionsView();
+        } catch (error) {
+            console.error('Failed to create transaction:', error);
+        }
+    });
 
-    const name = document.getElementById('account-name').value;
-    const type = document.getElementById('account-type').value;
-    const balance = parseFloat(document.getElementById('account-balance').value);
+    // Account form
+    document.getElementById('account-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    try {
-        await apiCall('/accounts', {
-            method: 'POST',
-            body: JSON.stringify({
-                name,
-                type,
-                balance: Math.round(balance * 100)
-            })
-        });
+        const name = document.getElementById('account-name').value;
+        const type = document.getElementById('account-type').value;
+        const balance = parseFloat(document.getElementById('account-balance').value);
 
-        closeModal('account-modal');
-        document.getElementById('account-form').reset();
+        try {
+            await apiCall('/accounts', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    type,
+                    balance: Math.round(balance * 100)
+                })
+            });
 
-        // Reload accounts
-        await loadAccounts();
-        loadAccountsView();
-    } catch (error) {
-        console.error('Failed to create account:', error);
-    }
-});
+            closeModal('account-modal');
+            document.getElementById('account-form').reset();
+            showToast('Account created successfully!');
 
-document.getElementById('category-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+            // Reload accounts
+            await loadAccounts();
+            loadAccountsView();
+        } catch (error) {
+            console.error('Failed to create account:', error);
+        }
+    });
 
-    const name = document.getElementById('category-name').value;
-    const type = document.getElementById('category-type').value;
-    const color = document.getElementById('category-color').value;
-    const description = document.getElementById('category-description').value;
+    // Category form
+    document.getElementById('category-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    try {
-        await apiCall('/categories', {
-            method: 'POST',
-            body: JSON.stringify({
-                name,
-                type,
-                color,
-                description
-            })
-        });
+        const name = document.getElementById('category-name').value;
+        const type = document.getElementById('category-type').value;
+        const color = document.getElementById('category-color').value;
+        const description = document.getElementById('category-description').value;
 
-        closeModal('category-modal');
-        document.getElementById('category-form').reset();
+        try {
+            await apiCall('/categories', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    type,
+                    color,
+                    description
+                })
+            });
 
-        // Reload categories
-        await loadCategories();
-        loadCategoriesView();
-    } catch (error) {
-        console.error('Failed to create category:', error);
-    }
-});
+            closeModal('category-modal');
+            document.getElementById('category-form').reset();
+            showToast('Category created successfully!');
 
-document.getElementById('allocation-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+            // Reload categories
+            await loadCategories();
+            loadCategoriesView();
+            loadBudgetView();
+        } catch (error) {
+            console.error('Failed to create category:', error);
+        }
+    });
 
-    const categoryId = document.getElementById('allocation-category-id').value;
-    const amount = parseFloat(document.getElementById('allocation-amount').value);
-    const notes = document.getElementById('allocation-notes').value;
-    const period = getCurrentPeriod();
+    // Allocation form
+    document.getElementById('allocation-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    try {
-        await apiCall('/allocations', {
-            method: 'POST',
-            body: JSON.stringify({
-                category_id: categoryId,
-                amount: Math.round(amount * 100),
-                period,
-                notes
-            })
-        });
+        const categoryId = document.getElementById('allocation-category-id').value;
+        const amount = parseFloat(document.getElementById('allocation-amount').value);
+        const notes = document.getElementById('allocation-notes').value;
+        const period = getCurrentPeriod();
 
-        closeModal('allocation-modal');
-        document.getElementById('allocation-form').reset();
+        try {
+            await apiCall('/allocations', {
+                method: 'POST',
+                body: JSON.stringify({
+                    category_id: categoryId,
+                    amount: Math.round(amount * 100),
+                    period,
+                    notes
+                })
+            });
 
-        // Reload budget view
-        loadBudgetView();
-    } catch (error) {
-        console.error('Failed to create allocation:', error);
-    }
+            closeModal('allocation-modal');
+            document.getElementById('allocation-form').reset();
+            showToast('Budget allocated successfully!');
+
+            // Reload budget view
+            loadBudgetView();
+        } catch (error) {
+            console.error('Failed to create allocation:', error);
+        }
+    });
+
+    // Initialize the app
+    init();
 });
 
 // Initialize the app
@@ -502,10 +573,12 @@ async function init() {
         await loadAccounts();
         await loadCategories();
         await loadBudgetView();
+
+        // Show helpful message if starting fresh
+        if (accounts.length === 0 && categories.length === 0) {
+            showToast('Welcome! Start by creating an account and some categories.', 'success');
+        }
     } catch (error) {
         console.error('Failed to initialize app:', error);
     }
 }
-
-// Start the app when the page loads
-window.addEventListener('DOMContentLoaded', init);
