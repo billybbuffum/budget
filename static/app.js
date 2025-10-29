@@ -164,10 +164,9 @@ async function loadBudgetView() {
         document.getElementById('ready-to-assign').textContent = formatCurrency(readyToAssign);
 
         const budgetCategories = document.getElementById('budget-categories');
-        // Filter out payment categories (those auto-created for credit cards)
-        const userCategories = categories.filter(c => !c.payment_for_account_id);
 
-        if (userCategories.length === 0) {
+        // Show all categories including payment categories (so users can see CC payment allocations)
+        if (categories.length === 0) {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
                     <p class="text-gray-500 mb-4">No expense categories yet.</p>
@@ -177,7 +176,7 @@ async function loadBudgetView() {
             return;
         }
 
-        budgetCategories.innerHTML = userCategories.map(category => {
+        budgetCategories.innerHTML = categories.map(category => {
             const allocation = allocations.find(a => a.category_id === category.id);
             const summaryItem = summary.find(s => s.category?.id === category.id);
 
@@ -187,26 +186,35 @@ async function loadBudgetView() {
 
             const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
 
+            // Payment categories are system-managed and cannot be manually edited
+            const isPaymentCategory = category.payment_for_account_id !== null && category.payment_for_account_id !== undefined;
+            const allocatedDisplay = isPaymentCategory
+                ? `<div class="font-semibold" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
+                : `<div
+                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
+                    title="Click to edit allocation"
+                >
+                    ${formatCurrency(allocated)}
+                </div>`;
+
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50' : ''}">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 flex-1">
                             <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                             <div class="flex-1">
-                                <div class="font-semibold text-gray-800">${category.name}</div>
+                                <div class="font-semibold text-gray-800">
+                                    ${category.name}
+                                    ${isPaymentCategory ? '<span class="ml-2 text-xs text-orange-600 font-normal">(Auto-managed)</span>' : ''}
+                                </div>
                                 ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
                             </div>
                         </div>
                         <div class="flex gap-6 items-center">
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Allocated</div>
-                                <div
-                                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
-                                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
-                                    title="Click to edit allocation"
-                                >
-                                    ${formatCurrency(allocated)}
-                                </div>
+                                ${allocatedDisplay}
                             </div>
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Spent</div>
