@@ -50,7 +50,7 @@ func main() {
 	accountHandler := handlers.NewAccountHandler(accountService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
-	allocationHandler := handlers.NewAllocationHandler(allocationService, accountRepo)
+	allocationHandler := handlers.NewAllocationHandler(allocationService)
 
 	// Setup router
 	router := http.NewRouter(accountHandler, categoryHandler, transactionHandler, allocationHandler)

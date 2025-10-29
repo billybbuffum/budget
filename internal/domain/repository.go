@@ -42,7 +42,6 @@ type AllocationRepository interface {
 	GetByCategoryAndPeriod(ctx context.Context, categoryID, period string) (*Allocation, error)
 	ListByPeriod(ctx context.Context, period string) ([]*Allocation, error)
 	List(ctx context.Context) ([]*Allocation, error)
-	GetTotalAllocated(ctx context.Context) (int64, error)
 	Update(ctx context.Context, allocation *Allocation) error
 	Delete(ctx context.Context, id string) error
 }
