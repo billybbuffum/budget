@@ -12,18 +12,21 @@ import (
 // AccountService handles account-related business logic
 type AccountService struct {
 	accountRepo     domain.AccountRepository
+	categoryRepo    domain.CategoryRepository
 	budgetStateRepo domain.BudgetStateRepository
 }
 
 // NewAccountService creates a new account service
-func NewAccountService(accountRepo domain.AccountRepository, budgetStateRepo domain.BudgetStateRepository) *AccountService {
+func NewAccountService(accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, budgetStateRepo domain.BudgetStateRepository) *AccountService {
 	return &AccountService{
 		accountRepo:     accountRepo,
+		categoryRepo:    categoryRepo,
 		budgetStateRepo: budgetStateRepo,
 	}
 }
 
 // CreateAccount creates a new account
+// For credit card accounts, automatically creates a payment category
 func (s *AccountService) CreateAccount(ctx context.Context, name string, balance int64, accountType domain.AccountType) (*domain.Account, error) {
 	if name == "" {
 		return nil, fmt.Errorf("account name is required")
@@ -31,7 +34,8 @@ func (s *AccountService) CreateAccount(ctx context.Context, name string, balance
 
 	if accountType != domain.AccountTypeChecking &&
 	   accountType != domain.AccountTypeSavings &&
-	   accountType != domain.AccountTypeCash {
+	   accountType != domain.AccountTypeCash &&
+	   accountType != domain.AccountTypeCredit {
 		return nil, fmt.Errorf("invalid account type")
 	}
 
@@ -48,13 +52,42 @@ func (s *AccountService) CreateAccount(ctx context.Context, name string, balance
 		return nil, err
 	}
 
-	// If account has a starting balance, add it to Ready to Assign
-	// This represents money in accounts that hasn't been assigned to categories yet
-	if balance != 0 {
-		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
-			// Rollback account creation if Ready to Assign update fails
+	// For credit cards, create a payment category
+	if accountType == domain.AccountTypeCredit {
+		paymentCategory := &domain.Category{
+			ID:                  uuid.New().String(),
+			Name:                name + " Payment",
+			Description:         "Payment category for " + name,
+			Color:               "#FF6B6B", // Red-ish color for credit card payments
+			PaymentForAccountID: &account.ID,
+			CreatedAt:           time.Now(),
+			UpdatedAt:           time.Now(),
+		}
+		if err := s.categoryRepo.Create(ctx, paymentCategory); err != nil {
+			// Rollback account creation if payment category fails
 			s.accountRepo.Delete(ctx, account.ID)
-			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+			return nil, fmt.Errorf("failed to create payment category: %w", err)
+		}
+
+		// For credit cards with negative balance (existing debt), that money needs to be budgeted
+		// to pay it off. We DON'T increase Ready to Assign (there's no new money),
+		// but we also don't decrease it (the debt already existed).
+		// If balance is positive (credit - you overpaid), increase Ready to Assign
+		if balance > 0 {
+			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
+				s.categoryRepo.Delete(ctx, paymentCategory.ID)
+				s.accountRepo.Delete(ctx, account.ID)
+				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+			}
+		}
+	} else {
+		// For non-credit accounts, balance goes to Ready to Assign
+		if balance != 0 {
+			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
+				// Rollback account creation if Ready to Assign update fails
+				s.accountRepo.Delete(ctx, account.ID)
+				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+			}
 		}
 	}
 
@@ -92,7 +125,8 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id, name string, bal
 	if accountType != "" {
 		if accountType != domain.AccountTypeChecking &&
 		   accountType != domain.AccountTypeSavings &&
-		   accountType != domain.AccountTypeCash {
+		   accountType != domain.AccountTypeCash &&
+		   accountType != domain.AccountTypeCredit {
 			return nil, fmt.Errorf("invalid account type")
 		}
 		account.Type = accountType
