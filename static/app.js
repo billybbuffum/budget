@@ -142,6 +142,9 @@ function showView(viewName) {
         case 'transactions':
             loadTransactionsView();
             break;
+        case 'import':
+            loadImportView();
+            break;
         case 'categories':
             loadCategoriesView();
             break;
@@ -508,6 +511,86 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     });
 }
 
+// Load uncategorized transactions
+async function loadUncategorizedTransactions() {
+    try {
+        const transactions = await apiCall('/transactions?uncategorized=true');
+
+        const listContainer = document.getElementById('uncategorized-list');
+
+        if (transactions.length === 0) {
+            listContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No uncategorized transactions</p>';
+            return;
+        }
+
+        listContainer.innerHTML = `
+            <div class="mb-3 flex gap-2">
+                <button onclick="selectAllUncategorized()" class="btn-secondary text-sm">Select All</button>
+                <button onclick="showCategorizeModal()" class="btn-primary text-sm">Categorize Selected</button>
+            </div>
+            ${transactions.map(txn => {
+                const account = accounts.find(a => a.id === txn.account_id);
+                const amountClass = txn.amount >= 0 ? 'text-green-600' : 'text-red-600';
+                return `
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition">
+                        <input type="checkbox" class="uncategorized-checkbox" data-transaction-id="${txn.id}">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-gray-800 truncate">${txn.description || 'No description'}</div>
+                                    <div class="text-xs text-gray-500">${account ? account.name : 'Unknown'} • ${new Date(txn.date).toLocaleDateString()}</div>
+                                </div>
+                                <div class="font-semibold ${amountClass} whitespace-nowrap">${formatCurrency(txn.amount)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        `;
+    } catch (error) {
+        console.error('Failed to load uncategorized transactions:', error);
+    }
+}
+
+// Select all uncategorized transactions
+function selectAllUncategorized() {
+    const checkboxes = document.querySelectorAll('.uncategorized-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+// Show categorize modal
+function showCategorizeModal() {
+    const checkboxes = document.querySelectorAll('.uncategorized-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.transactionId);
+
+    if (selectedIds.length === 0) {
+        showToast('Please select transactions to categorize', 'error');
+        return;
+    }
+
+    window.selectedTransactions = selectedIds;
+    document.getElementById('categorize-count').textContent = selectedIds.length;
+
+    // Populate category dropdown
+    const categorySelect = document.getElementById('categorize-category');
+    categorySelect.innerHTML = '<option value="">Select category...</option>' +
+        categories.map(cat => `<option value="${cat.id}">${cat.name} (${cat.type})</option>`).join('');
+
+    showModal('categorize-modal');
+}
+
+// Load import view
+async function loadImportView() {
+    // Populate account dropdown
+    const accountSelect = document.getElementById('import-account');
+    accountSelect.innerHTML = '<option value="">Choose account to import into...</option>' +
+        accounts.map(acc => `<option value="${acc.id}">${acc.name} (${acc.type})</option>`).join('');
+
+    // Load uncategorized transactions
+    await loadUncategorizedTransactions();
+}
+
 // Form submissions
 document.addEventListener('DOMContentLoaded', function() {
     // Transaction form
@@ -645,6 +728,91 @@ document.addEventListener('DOMContentLoaded', function() {
             loadBudgetView();
         } catch (error) {
             console.error('Failed to create allocation:', error);
+        }
+    });
+
+    // Import form
+    document.getElementById('import-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const accountId = document.getElementById('import-account').value;
+        const fileInput = document.getElementById('import-file');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showToast('Please select a file', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('account_id', accountId);
+        formData.append('file', file);
+
+        try {
+            const button = e.target.querySelector('button[type="submit"]');
+            button.disabled = true;
+            button.textContent = 'Importing...';
+
+            const response = await fetch('/api/transactions/import', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Import failed');
+            }
+
+            const result = await response.json();
+
+            button.disabled = false;
+            button.textContent = 'Import Transactions';
+            fileInput.value = '';
+
+            showToast(`Imported ${result.imported_transactions} transactions (${result.skipped_duplicates} duplicates skipped)`);
+
+            // Reload data
+            await loadAccounts();
+            await loadUncategorizedTransactions();
+        } catch (error) {
+            console.error('Failed to import:', error);
+            showToast(error.message || 'Import failed', 'error');
+            e.target.querySelector('button[type="submit"]').disabled = false;
+            e.target.querySelector('button[type="submit"]').textContent = 'Import Transactions';
+        }
+    });
+
+    // Categorize form
+    document.getElementById('categorize-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const categoryId = document.getElementById('categorize-category').value;
+        const selectedTransactions = window.selectedTransactions || [];
+
+        if (selectedTransactions.length === 0) {
+            showToast('No transactions selected', 'error');
+            return;
+        }
+
+        try {
+            await apiCall('/transactions/bulk-categorize', {
+                method: 'POST',
+                body: JSON.stringify({
+                    transaction_ids: selectedTransactions,
+                    category_id: categoryId || null
+                })
+            });
+
+            closeModal('categorize-modal');
+            document.getElementById('categorize-form').reset();
+            window.selectedTransactions = [];
+            showToast(`Categorized ${selectedTransactions.length} transaction(s)`);
+
+            // Reload uncategorized transactions
+            await loadUncategorizedTransactions();
+        } catch (error) {
+            console.error('Failed to categorize:', error);
+            showToast('Failed to categorize transactions', 'error');
         }
     });
 
