@@ -100,16 +100,6 @@ func (r *allocationRepository) List(ctx context.Context) ([]*domain.Allocation, 
 	return r.scanAllocations(rows)
 }
 
-func (r *allocationRepository) GetTotalAllocated(ctx context.Context) (int64, error) {
-	query := `SELECT COALESCE(SUM(amount), 0) FROM allocations`
-	var total int64
-	err := r.db.QueryRowContext(ctx, query).Scan(&total)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get total allocated: %w", err)
-	}
-	return total, nil
-}
-
 func (r *allocationRepository) Update(ctx context.Context, allocation *domain.Allocation) error {
 	query := `
 		UPDATE allocations

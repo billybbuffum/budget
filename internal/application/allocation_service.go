@@ -182,7 +182,7 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
 // The backend automatically coordinates this value when transactions and allocations change
-func (s *AllocationService) GetReadyToAssign(ctx context.Context, accountRepo domain.AccountRepository) (int64, error) {
+func (s *AllocationService) GetReadyToAssign(ctx context.Context) (int64, error) {
 	state, err := s.budgetStateRepo.Get(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get budget state: %w", err)
