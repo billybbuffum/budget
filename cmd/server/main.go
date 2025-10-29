@@ -41,7 +41,7 @@ func main() {
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
 
 	// Initialize services
-	accountService := application.NewAccountService(accountRepo)
+	accountService := application.NewAccountService(accountRepo, budgetStateRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo)
