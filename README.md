@@ -32,14 +32,72 @@ budget/
 
 ## Prerequisites
 
+### Option 1: Docker (Recommended - No Go Installation Required)
+- Docker
+- Docker Compose (optional, but recommended)
+
+### Option 2: Local Go Development
 - Go 1.22 or higher
 - SQLite3
 
 ## Getting Started
 
-### Installation
+### Option 1: Running with Docker (Easiest)
+
+**Using Docker Compose (Recommended):**
 
 1. Clone the repository:
+```bash
+git clone https://github.com/billybbuffum/budget.git
+cd budget
+```
+
+2. Start the application:
+```bash
+docker-compose up -d
+```
+
+The server will start on `http://localhost:8080`. The database is persisted in a Docker volume, so your data survives container restarts.
+
+**Useful Docker Compose commands:**
+```bash
+# View logs
+docker-compose logs -f
+
+# Stop the application
+docker-compose down
+
+# Stop and remove data volume (WARNING: deletes all data)
+docker-compose down -v
+
+# Rebuild after code changes
+docker-compose up -d --build
+```
+
+**Using Docker directly:**
+
+```bash
+# Build the image
+docker build -t budget-app .
+
+# Run the container
+docker run -d \
+  --name budget-app \
+  -p 8080:8080 \
+  -v budget-data:/app/data \
+  budget-app
+
+# View logs
+docker logs -f budget-app
+
+# Stop the container
+docker stop budget-app
+docker rm budget-app
+```
+
+### Option 2: Running with Go
+
+1. Clone the repository (if you haven't already):
 ```bash
 git clone https://github.com/billybbuffum/budget.git
 cd budget
@@ -50,9 +108,7 @@ cd budget
 go mod download
 ```
 
-### Running the Application
-
-Start the server:
+3. Start the server:
 ```bash
 go run cmd/server/main.go
 ```
