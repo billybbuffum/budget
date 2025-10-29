@@ -46,3 +46,10 @@ type AllocationRepository interface {
 	Update(ctx context.Context, allocation *Allocation) error
 	Delete(ctx context.Context, id string) error
 }
+
+// BudgetStateRepository defines the interface for budget state operations
+type BudgetStateRepository interface {
+	Get(ctx context.Context) (*BudgetState, error)
+	Update(ctx context.Context, state *BudgetState) error
+	AdjustReadyToAssign(ctx context.Context, delta int64) error
+}

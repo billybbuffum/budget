@@ -38,12 +38,13 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
 	allocationRepo := repository.NewAllocationRepository(db)
+	budgetStateRepo := repository.NewBudgetStateRepository(db)
 
 	// Initialize services
 	accountService := application.NewAccountService(accountRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
-	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo)
-	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo)
+	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, budgetStateRepo)
+	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo)
 
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)

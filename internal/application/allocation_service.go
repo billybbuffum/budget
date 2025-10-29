@@ -14,6 +14,7 @@ type AllocationService struct {
 	allocationRepo  domain.AllocationRepository
 	categoryRepo    domain.CategoryRepository
 	transactionRepo domain.TransactionRepository
+	budgetStateRepo domain.BudgetStateRepository
 }
 
 // NewAllocationService creates a new allocation service
@@ -21,11 +22,13 @@ func NewAllocationService(
 	allocationRepo domain.AllocationRepository,
 	categoryRepo domain.CategoryRepository,
 	transactionRepo domain.TransactionRepository,
+	budgetStateRepo domain.BudgetStateRepository,
 ) *AllocationService {
 	return &AllocationService{
 		allocationRepo:  allocationRepo,
 		categoryRepo:    categoryRepo,
 		transactionRepo: transactionRepo,
+		budgetStateRepo: budgetStateRepo,
 	}
 }
 
@@ -52,13 +55,24 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 	// Check if allocation already exists for this category+period
 	existing, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, categoryID, period)
 	if err == nil {
-		// Update existing allocation
+		// Update existing allocation - adjust Ready to Assign by the difference
+		oldAmount := existing.Amount
+		delta := amount - oldAmount
+
 		existing.Amount = amount
 		existing.Notes = notes
 		existing.UpdatedAt = time.Now()
 		if err := s.allocationRepo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
+
+		// Adjust Ready to Assign by the difference (decrease if allocating more)
+		if delta != 0 {
+			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -delta); err != nil {
+				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+			}
+		}
+
 		return existing, nil
 	}
 
@@ -75,6 +89,14 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 
 	if err := s.allocationRepo.Create(ctx, allocation); err != nil {
 		return nil, err
+	}
+
+	// Decrease Ready to Assign by the allocated amount
+	// Backend coordinates this automatically!
+	if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -amount); err != nil {
+		// Rollback if Ready to Assign update fails
+		s.allocationRepo.Delete(ctx, allocation.ID)
+		return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
 	}
 
 	return allocation, nil
@@ -158,23 +180,33 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 	return summaries, nil
 }
 
-// GetReadyToAssign calculates how much money is available to assign
-// Formula: Total Account Balance - Total Allocated
+// GetReadyToAssign reads the Ready to Assign amount from the database
+// The backend automatically coordinates this value when transactions and allocations change
 func (s *AllocationService) GetReadyToAssign(ctx context.Context, accountRepo domain.AccountRepository) (int64, error) {
-	totalBalance, err := accountRepo.GetTotalBalance(ctx)
+	state, err := s.budgetStateRepo.Get(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get budget state: %w", err)
 	}
-
-	totalAllocated, err := s.allocationRepo.GetTotalAllocated(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	return totalBalance - totalAllocated, nil
+	return state.ReadyToAssign, nil
 }
 
-// DeleteAllocation deletes an allocation
+// DeleteAllocation deletes an allocation and returns money to Ready to Assign
 func (s *AllocationService) DeleteAllocation(ctx context.Context, id string) error {
-	return s.allocationRepo.Delete(ctx, id)
+	// Get the allocation to know how much to add back to Ready to Assign
+	allocation, err := s.allocationRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Delete the allocation
+	if err := s.allocationRepo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	// Return the allocated amount to Ready to Assign
+	if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, allocation.Amount); err != nil {
+		return fmt.Errorf("failed to adjust ready to assign: %w", err)
+	}
+
+	return nil
 }
