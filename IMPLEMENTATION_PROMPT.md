@@ -26,13 +26,15 @@ All these institutions support OFX/QFX export, which is a standardized XML-based
 ### Core Functionality
 
 **Import OFX/QFX Files**
-- User selects an account and uploads an OFX/QFX file
+- User manually selects which account to import to (from dropdown of existing accounts)
+- User uploads the corresponding OFX/QFX file for that account
 - Parse the file and extract transactions (date, amount, description, merchant)
 - Convert amounts from dollars to cents (stored as int64)
 - Check for duplicates (same account + date + amount + description)
 - Import new transactions as uncategorized (category_id = null)
 - Update account balance to reflect imported transactions
 - Return import summary (total, imported, skipped, errors)
+- Note: User will repeat this process for each account (9 total files)
 
 **Manage Uncategorized Transactions**
 - List all transactions where category_id is null
@@ -62,6 +64,14 @@ All these institutions support OFX/QFX export, which is a standardized XML-based
 **File Upload**: Limit to 10MB, validate file extensions (.ofx, .qfx)
 
 ## Key Design Decisions
+
+**Account Selection (Manual Approach)**
+- Each OFX/QFX file downloaded from a bank contains transactions for ONE specific account
+- Example: Chase Checking → chase-checking.ofx, Chase Sapphire CC → chase-sapphire.ofx
+- User workflow: Select account from dropdown → Upload corresponding file → Import
+- The app trusts the user to upload the correct file for the selected account
+- With 9 accounts total, the user will download and import 9 separate files
+- This is simpler than auto-detecting account from OFX metadata (can be added later)
 
 **Nullable Category ID**
 - Change `category_id TEXT NOT NULL` → `category_id TEXT` (nullable)
@@ -123,9 +133,17 @@ All these institutions support OFX/QFX export, which is a standardized XML-based
 ## API Endpoints to Add
 
 ```
-POST   /api/transactions/import           # Upload OFX file, import transactions
-GET    /api/transactions?uncategorized=true  # List uncategorized transactions
-PUT    /api/transactions/bulk-categorize  # Assign category to multiple transactions
+POST   /api/transactions/import
+       # Request: multipart/form-data with 'account_id' and 'file' fields
+       # User selects account manually, uploads OFX file for that account
+       # Returns import summary (total, imported, skipped, errors)
+
+GET    /api/transactions?uncategorized=true
+       # List all transactions where category_id is null
+
+PUT    /api/transactions/bulk-categorize
+       # Body: { transaction_ids: [...], category_id: "..." }
+       # Assign same category to multiple transactions
 ```
 
 ## Resources
