@@ -33,21 +33,29 @@ func NewTransactionService(
 }
 
 // CreateTransaction creates a new transaction and updates account balance
-// Positive amount = inflow (adds to account), Negative amount = outflow (subtracts from account)
-func (s *TransactionService) CreateTransaction(ctx context.Context, accountID, categoryID string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
+// Positive amount = inflow (adds to account) - category optional
+// Negative amount = outflow (subtracts from account) - category required
+func (s *TransactionService) CreateTransaction(ctx context.Context, accountID string, categoryID *string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
 	// Validate account exists
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
-	// Validate category exists
-	if _, err := s.categoryRepo.GetByID(ctx, categoryID); err != nil {
-		return nil, fmt.Errorf("category not found: %w", err)
-	}
-
 	if amount == 0 {
 		return nil, fmt.Errorf("amount must be non-zero")
+	}
+
+	// For expenses (negative amounts), category is required
+	if amount < 0 && (categoryID == nil || *categoryID == "") {
+		return nil, fmt.Errorf("category is required for expense transactions")
+	}
+
+	// Validate category if provided
+	if categoryID != nil && *categoryID != "" {
+		if _, err := s.categoryRepo.GetByID(ctx, *categoryID); err != nil {
+			return nil, fmt.Errorf("category not found: %w", err)
+		}
 	}
 
 	transaction := &domain.Transaction{
@@ -118,7 +126,7 @@ func (s *TransactionService) ListTransactionsByPeriod(ctx context.Context, start
 }
 
 // UpdateTransaction updates an existing transaction and adjusts account balance
-func (s *TransactionService) UpdateTransaction(ctx context.Context, id, accountID, categoryID string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
+func (s *TransactionService) UpdateTransaction(ctx context.Context, id, accountID string, categoryID *string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
 	// Get existing transaction
 	oldTransaction, err := s.transactionRepo.GetByID(ctx, id)
 	if err != nil {
@@ -161,14 +169,21 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id, accountI
 		}
 	}
 
-	if categoryID != "" {
-		if _, err := s.categoryRepo.GetByID(ctx, categoryID); err != nil {
-			return nil, fmt.Errorf("category not found: %w", err)
+	// Update category if provided
+	if categoryID != nil {
+		if *categoryID != "" {
+			if _, err := s.categoryRepo.GetByID(ctx, *categoryID); err != nil {
+				return nil, fmt.Errorf("category not found: %w", err)
+			}
 		}
 		oldTransaction.CategoryID = categoryID
 	}
 
 	if amount != 0 {
+		// Validate category requirement for expenses
+		if amount < 0 && (oldTransaction.CategoryID == nil || *oldTransaction.CategoryID == "") {
+			return nil, fmt.Errorf("category is required for expense transactions")
+		}
 		oldTransaction.Amount = amount
 	}
 

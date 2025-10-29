@@ -34,14 +34,10 @@ func NewAllocationService(
 
 // CreateAllocation creates a new allocation or updates existing one for category+period
 func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID string, amount int64, period, notes string) (*domain.Allocation, error) {
-	// Validate category exists and is an expense category
-	category, err := s.categoryRepo.GetByID(ctx, categoryID)
+	// Validate category exists
+	_, err := s.categoryRepo.GetByID(ctx, categoryID)
 	if err != nil {
 		return nil, fmt.Errorf("category not found: %w", err)
-	}
-
-	if category.Type != domain.CategoryTypeExpense {
-		return nil, fmt.Errorf("can only allocate to expense categories")
 	}
 
 	if amount < 0 {
@@ -120,8 +116,8 @@ func (s *AllocationService) ListAllocationsByPeriod(ctx context.Context, period 
 // GetAllocationSummary calculates allocation summary for a period with rollover
 // Shows: assigned this period, activity this period, available (with rollover)
 func (s *AllocationService) GetAllocationSummary(ctx context.Context, period string) ([]*domain.AllocationSummary, error) {
-	// Get all expense categories
-	categories, err := s.categoryRepo.ListByType(ctx, domain.CategoryTypeExpense)
+	// Get all categories
+	categories, err := s.categoryRepo.List(ctx)
 	if err != nil {
 		return nil, err
 	}

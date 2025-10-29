@@ -20,19 +20,14 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 }
 
 // CreateCategory creates a new category
-func (s *CategoryService) CreateCategory(ctx context.Context, name string, categoryType domain.CategoryType, description, color string) (*domain.Category, error) {
+func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
-	}
-
-	if categoryType != domain.CategoryTypeIncome && categoryType != domain.CategoryTypeExpense {
-		return nil, fmt.Errorf("invalid category type: must be 'income' or 'expense'")
 	}
 
 	category := &domain.Category{
 		ID:          uuid.New().String(),
 		Name:        name,
-		Type:        categoryType,
 		Description: description,
 		Color:       color,
 		CreatedAt:   time.Now(),
@@ -56,13 +51,8 @@ func (s *CategoryService) ListCategories(ctx context.Context) ([]*domain.Categor
 	return s.categoryRepo.List(ctx)
 }
 
-// ListCategoriesByType retrieves categories by type
-func (s *CategoryService) ListCategoriesByType(ctx context.Context, categoryType domain.CategoryType) ([]*domain.Category, error) {
-	return s.categoryRepo.ListByType(ctx, categoryType)
-}
-
 // UpdateCategory updates an existing category
-func (s *CategoryService) UpdateCategory(ctx context.Context, id, name string, categoryType domain.CategoryType, description, color string) (*domain.Category, error) {
+func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, description, color string) (*domain.Category, error) {
 	category, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -70,12 +60,6 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name string, c
 
 	if name != "" {
 		category.Name = name
-	}
-	if categoryType != "" {
-		if categoryType != domain.CategoryTypeIncome && categoryType != domain.CategoryTypeExpense {
-			return nil, fmt.Errorf("invalid category type: must be 'income' or 'expense'")
-		}
-		category.Type = categoryType
 	}
 	if description != "" {
 		category.Description = description
