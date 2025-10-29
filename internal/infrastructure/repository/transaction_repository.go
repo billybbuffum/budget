@@ -40,8 +40,9 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 		WHERE id = ?
 	`
 	transaction := &domain.Transaction{}
+	var categoryID sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
+		&transaction.ID, &transaction.AccountID, &categoryID,
 		&transaction.Amount, &transaction.Description, &transaction.Date,
 		&transaction.CreatedAt, &transaction.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -49,6 +50,9 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transaction: %w", err)
+	}
+	if categoryID.Valid {
+		transaction.CategoryID = &categoryID.String
 	}
 	return transaction, nil
 }
@@ -178,14 +182,92 @@ func (r *transactionRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (r *transactionRepository) ListUncategorized(ctx context.Context) ([]*domain.Transaction, error) {
+	query := `
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		FROM transactions
+		WHERE category_id IS NULL
+		ORDER BY date DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list uncategorized transactions: %w", err)
+	}
+	defer rows.Close()
+
+	return r.scanTransactions(rows)
+}
+
+func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID string, date string, amount int64, description string) (*domain.Transaction, error) {
+	query := `
+		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		FROM transactions
+		WHERE account_id = ? AND date = ? AND amount = ? AND description = ?
+		LIMIT 1
+	`
+	transaction := &domain.Transaction{}
+	var categoryID sql.NullString
+	err := r.db.QueryRowContext(ctx, query, accountID, date, amount, description).Scan(
+		&transaction.ID, &transaction.AccountID, &categoryID,
+		&transaction.Amount, &transaction.Description, &transaction.Date,
+		&transaction.CreatedAt, &transaction.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil // No duplicate found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find duplicate transaction: %w", err)
+	}
+	if categoryID.Valid {
+		transaction.CategoryID = &categoryID.String
+	}
+	return transaction, nil
+}
+
+func (r *transactionRepository) BulkUpdateCategory(ctx context.Context, transactionIDs []string, categoryID *string) error {
+	if len(transactionIDs) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	query := `UPDATE transactions SET category_id = ?, updated_at = ? WHERE id = ?`
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for _, id := range transactionIDs {
+		_, err := stmt.ExecContext(ctx, categoryID, now, id)
+		if err != nil {
+			return fmt.Errorf("failed to update transaction %s: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (r *transactionRepository) scanTransactions(rows *sql.Rows) ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
 	for rows.Next() {
 		transaction := &domain.Transaction{}
-		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &transaction.CategoryID,
+		var categoryID sql.NullString
+		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &categoryID,
 			&transaction.Amount, &transaction.Description, &transaction.Date,
 			&transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction: %w", err)
+		}
+		if categoryID.Valid {
+			transaction.CategoryID = &categoryID.String
 		}
 		transactions = append(transactions, transaction)
 	}

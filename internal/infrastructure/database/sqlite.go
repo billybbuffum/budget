@@ -29,6 +29,11 @@ func NewSQLiteDB(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	// Run migrations
+	if err := RunMigrations(db); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
 	return db, nil
 }
 

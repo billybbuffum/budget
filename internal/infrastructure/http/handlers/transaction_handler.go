@@ -18,18 +18,23 @@ func NewTransactionHandler(transactionService *application.TransactionService) *
 
 type CreateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
-	CategoryID  string    `json:"category_id"`
-	Amount      int64     `json:"amount"`      // in cents (positive=inflow, negative=outflow)
+	CategoryID  *string   `json:"category_id,omitempty"` // nullable for imported transactions
+	Amount      int64     `json:"amount"`                // in cents (positive=inflow, negative=outflow)
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
 }
 
 type UpdateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
-	CategoryID  string    `json:"category_id"`
+	CategoryID  *string   `json:"category_id,omitempty"` // nullable
 	Amount      int64     `json:"amount"`
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
+}
+
+type BulkCategorizeRequest struct {
+	TransactionIDs []string `json:"transaction_ids"`
+	CategoryID     *string  `json:"category_id,omitempty"`
 }
 
 func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
@@ -73,11 +78,14 @@ func (h *TransactionHandler) ListTransactions(w http.ResponseWriter, r *http.Req
 	categoryID := r.URL.Query().Get("category_id")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
+	uncategorized := r.URL.Query().Get("uncategorized")
 
 	var transactions interface{}
 	var err error
 
-	if accountID != "" {
+	if uncategorized == "true" {
+		transactions, err = h.transactionService.ListUncategorizedTransactions(r.Context())
+	} else if accountID != "" {
 		transactions, err = h.transactionService.ListTransactionsByAccount(r.Context(), accountID)
 	} else if categoryID != "" {
 		transactions, err = h.transactionService.ListTransactionsByCategory(r.Context(), categoryID)
@@ -135,6 +143,26 @@ func (h *TransactionHandler) DeleteTransaction(w http.ResponseWriter, r *http.Re
 
 	if err := h.transactionService.DeleteTransaction(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *TransactionHandler) BulkCategorizeTransactions(w http.ResponseWriter, r *http.Request) {
+	var req BulkCategorizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.TransactionIDs) == 0 {
+		http.Error(w, "transaction_ids is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.transactionService.BulkCategorizeTransactions(r.Context(), req.TransactionIDs, req.CategoryID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/billybbuffum/budget/internal/infrastructure/database"
 	"github.com/billybbuffum/budget/internal/infrastructure/http"
 	"github.com/billybbuffum/budget/internal/infrastructure/http/handlers"
+	"github.com/billybbuffum/budget/internal/infrastructure/ofx"
 	"github.com/billybbuffum/budget/internal/infrastructure/repository"
 )
 
@@ -40,20 +41,25 @@ func main() {
 	allocationRepo := repository.NewAllocationRepository(db)
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
 
+	// Initialize OFX parser
+	ofxParser := ofx.NewParser()
+
 	// Initialize services
 	accountService := application.NewAccountService(accountRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo)
+	importService := application.NewImportService(transactionRepo, accountRepo, ofxParser)
 
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	allocationHandler := handlers.NewAllocationHandler(allocationService)
+	importHandler := handlers.NewImportHandler(importService)
 
 	// Setup router
-	router := http.NewRouter(accountHandler, categoryHandler, transactionHandler, allocationHandler)
+	router := http.NewRouter(accountHandler, categoryHandler, transactionHandler, allocationHandler, importHandler)
 
 	// Create server
 	server := http.NewServer(fmt.Sprintf(":%s", cfg.Server.Port), router)
