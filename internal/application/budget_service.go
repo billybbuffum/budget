@@ -174,18 +174,21 @@ func (s *BudgetService) DeleteBudget(ctx context.Context, id string) error {
 	return s.budgetRepo.Delete(ctx, id)
 }
 
-// parsePeriod converts a period string (YYYY-MM) to start and end dates
+// parsePeriod converts a period string (YYYY-MM) to start and end dates in UTC
 func parsePeriod(period string) (string, string, error) {
-	// Parse the period as YYYY-MM
+	// Parse the period as YYYY-MM in UTC
 	t, err := time.Parse("2006-01", period)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Start of month
-	startDate := t.Format(time.RFC3339)
+	// Ensure we're working in UTC
+	t = t.UTC()
 
-	// End of month
+	// Start of month - go back 1 second to ensure we include 00:00:00
+	startDate := t.Add(-time.Second).Format(time.RFC3339)
+
+	// End of month at 23:59:59
 	endDate := t.AddDate(0, 1, 0).Add(-time.Second).Format(time.RFC3339)
 
 	return startDate, endDate, nil
