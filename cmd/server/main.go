@@ -34,25 +34,25 @@ func main() {
 	log.Println("Database initialized successfully")
 
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(db)
+	accountRepo := repository.NewAccountRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
-	budgetRepo := repository.NewBudgetRepository(db)
+	allocationRepo := repository.NewAllocationRepository(db)
 
 	// Initialize services
-	userService := application.NewUserService(userRepo)
+	accountService := application.NewAccountService(accountRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
-	transactionService := application.NewTransactionService(transactionRepo, userRepo, categoryRepo)
-	budgetService := application.NewBudgetService(budgetRepo, categoryRepo, transactionRepo)
+	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo)
+	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo)
 
 	// Initialize handlers
-	userHandler := handlers.NewUserHandler(userService)
+	accountHandler := handlers.NewAccountHandler(accountService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
-	budgetHandler := handlers.NewBudgetHandler(budgetService)
+	allocationHandler := handlers.NewAllocationHandler(allocationService, accountRepo)
 
 	// Setup router
-	router := http.NewRouter(userHandler, categoryHandler, transactionHandler, budgetHandler)
+	router := http.NewRouter(accountHandler, categoryHandler, transactionHandler, allocationHandler)
 
 	// Create server
 	server := http.NewServer(fmt.Sprintf(":%s", cfg.Server.Port), router)
