@@ -49,7 +49,7 @@ func main() {
 	categoryService := application.NewCategoryService(categoryRepo)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo)
-	importService := application.NewImportService(transactionRepo, accountRepo, ofxParser)
+	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser)
 
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)
