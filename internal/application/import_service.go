@@ -85,8 +85,9 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 			time.UTC,
 		)
 
-		// Check for duplicate
-		existing, err := s.transactionRepo.FindDuplicate(ctx, accountID, normalizedDate, ofxTxn.Amount, ofxTxn.Description)
+		// Check for duplicate using FitID (Financial Institution Transaction ID)
+		// FitID is a unique identifier from the bank, more reliable than date+amount+description
+		existing, err := s.transactionRepo.FindByFitID(ctx, accountID, ofxTxn.FitID)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("error checking duplicate for transaction: %v", err))
 			continue
@@ -105,6 +106,7 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 			Amount:      ofxTxn.Amount,
 			Description: ofxTxn.Description,
 			Date:        normalizedDate,
+			FitID:       &ofxTxn.FitID, // Store FitID for duplicate detection
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}
