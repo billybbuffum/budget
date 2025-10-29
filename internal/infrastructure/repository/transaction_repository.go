@@ -103,7 +103,7 @@ func (r *transactionRepository) ListByPeriod(ctx context.Context, startDate, end
 	query := `
 		SELECT id, user_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
-		WHERE date BETWEEN ? AND ?
+		WHERE date >= ? AND date <= ?
 		ORDER BY date DESC
 	`
 	rows, err := r.db.QueryContext(ctx, query, startDate, endDate)
