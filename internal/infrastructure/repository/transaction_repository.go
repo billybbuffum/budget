@@ -124,7 +124,7 @@ func (r *transactionRepository) GetCategoryActivity(ctx context.Context, categor
 	}
 
 	t = t.UTC()
-	startDate := t.Add(-time.Second).Format(time.RFC3339)
+	startDate := t.Format(time.RFC3339)
 	endDate := t.AddDate(0, 1, 0).Add(-time.Second).Format(time.RFC3339)
 
 	query := `

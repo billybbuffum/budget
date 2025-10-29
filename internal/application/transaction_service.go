@@ -11,9 +11,10 @@ import (
 
 // TransactionService handles transaction-related business logic
 type TransactionService struct {
-	transactionRepo domain.TransactionRepository
-	accountRepo     domain.AccountRepository
-	categoryRepo    domain.CategoryRepository
+	transactionRepo   domain.TransactionRepository
+	accountRepo       domain.AccountRepository
+	categoryRepo      domain.CategoryRepository
+	budgetStateRepo   domain.BudgetStateRepository
 }
 
 // NewTransactionService creates a new transaction service
@@ -21,11 +22,13 @@ func NewTransactionService(
 	transactionRepo domain.TransactionRepository,
 	accountRepo domain.AccountRepository,
 	categoryRepo domain.CategoryRepository,
+	budgetStateRepo domain.BudgetStateRepository,
 ) *TransactionService {
 	return &TransactionService{
 		transactionRepo: transactionRepo,
 		accountRepo:     accountRepo,
 		categoryRepo:    categoryRepo,
+		budgetStateRepo: budgetStateRepo,
 	}
 }
 
@@ -69,6 +72,21 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID, c
 		// Rollback transaction creation if balance update fails
 		s.transactionRepo.Delete(ctx, transaction.ID)
 		return nil, fmt.Errorf("failed to update account balance: %w", err)
+	}
+
+	// If this is an income transaction (positive amount), increase Ready to Assign
+	// Backend coordinates this automatically!
+	if amount > 0 {
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, amount); err != nil {
+			// Rollback if Ready to Assign update fails
+			s.accountRepo.Update(ctx, &domain.Account{
+				ID:        account.ID,
+				Balance:   account.Balance - amount,
+				UpdatedAt: time.Now(),
+			})
+			s.transactionRepo.Delete(ctx, transaction.ID)
+			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
 	}
 
 	return transaction, nil
@@ -196,6 +214,13 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, id string) e
 	// Then update account balance
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return fmt.Errorf("failed to update account balance: %w", err)
+	}
+
+	// If this was an income transaction, decrease Ready to Assign
+	if transaction.Amount > 0 {
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -transaction.Amount); err != nil {
+			return fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
 	}
 
 	return nil

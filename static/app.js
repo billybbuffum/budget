@@ -175,11 +175,11 @@ async function loadBudgetView() {
 
         budgetCategories.innerHTML = expenseCategories.map(category => {
             const allocation = allocations.find(a => a.category_id === category.id);
-            const summaryItem = summary.find(s => s.category_id === category.id);
+            const summaryItem = summary.find(s => s.category?.id === category.id);
 
             const allocated = allocation?.amount || 0;
-            const spent = summaryItem?.spent || 0;
-            const available = allocated - spent;
+            const spent = summaryItem?.activity ? -summaryItem.activity : 0; // Activity is negative for expenses
+            const available = summaryItem?.available || (allocated - spent);
 
             const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
 
