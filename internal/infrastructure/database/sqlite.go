@@ -79,11 +79,21 @@ func initSchema(db *sql.DB) error {
 		UNIQUE(category_id, period)
 	);
 
+	CREATE TABLE IF NOT EXISTS budget_state (
+		id TEXT PRIMARY KEY,
+		ready_to_assign INTEGER NOT NULL DEFAULT 0,
+		updated_at DATETIME NOT NULL
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 	CREATE INDEX IF NOT EXISTS idx_allocations_period ON allocations(period);
 	CREATE INDEX IF NOT EXISTS idx_allocations_category_id ON allocations(category_id);
+
+	-- Insert default budget state if it doesn't exist
+	INSERT OR IGNORE INTO budget_state (id, ready_to_assign, updated_at)
+	VALUES ('singleton', 0, datetime('now'));
 	`
 
 	_, err := db.Exec(schema)

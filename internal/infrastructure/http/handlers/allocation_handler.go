@@ -5,18 +5,15 @@ import (
 	"net/http"
 
 	"github.com/billybbuffum/budget/internal/application"
-	"github.com/billybbuffum/budget/internal/domain"
 )
 
 type AllocationHandler struct {
 	allocationService *application.AllocationService
-	accountRepo       domain.AccountRepository
 }
 
-func NewAllocationHandler(allocationService *application.AllocationService, accountRepo domain.AccountRepository) *AllocationHandler {
+func NewAllocationHandler(allocationService *application.AllocationService) *AllocationHandler {
 	return &AllocationHandler{
 		allocationService: allocationService,
-		accountRepo:       accountRepo,
 	}
 }
 
@@ -101,7 +98,7 @@ func (h *AllocationHandler) GetAllocationSummary(w http.ResponseWriter, r *http.
 }
 
 func (h *AllocationHandler) GetReadyToAssign(w http.ResponseWriter, r *http.Request) {
-	readyToAssign, err := h.allocationService.GetReadyToAssign(r.Context(), h.accountRepo)
+	readyToAssign, err := h.allocationService.GetReadyToAssign(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
