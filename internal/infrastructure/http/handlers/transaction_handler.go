@@ -24,6 +24,14 @@ type CreateTransactionRequest struct {
 	Date        time.Time `json:"date"`
 }
 
+type CreateTransferRequest struct {
+	FromAccountID string    `json:"from_account_id"`
+	ToAccountID   string    `json:"to_account_id"`
+	Amount        int64     `json:"amount"`      // in cents (must be positive)
+	Description   string    `json:"description"`
+	Date          time.Time `json:"date"`
+}
+
 type UpdateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
 	CategoryID  *string   `json:"category_id,omitempty"`
@@ -139,4 +147,23 @@ func (h *TransactionHandler) DeleteTransaction(w http.ResponseWriter, r *http.Re
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *TransactionHandler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
+	var req CreateTransferRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	transaction, err := h.transactionService.CreateTransfer(
+		r.Context(), req.FromAccountID, req.ToAccountID, req.Amount, req.Description, req.Date)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(transaction)
 }

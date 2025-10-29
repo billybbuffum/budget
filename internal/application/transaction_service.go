@@ -14,6 +14,7 @@ type TransactionService struct {
 	transactionRepo   domain.TransactionRepository
 	accountRepo       domain.AccountRepository
 	categoryRepo      domain.CategoryRepository
+	allocationRepo    domain.AllocationRepository
 	budgetStateRepo   domain.BudgetStateRepository
 }
 
@@ -22,19 +23,23 @@ func NewTransactionService(
 	transactionRepo domain.TransactionRepository,
 	accountRepo domain.AccountRepository,
 	categoryRepo domain.CategoryRepository,
+	allocationRepo domain.AllocationRepository,
 	budgetStateRepo domain.BudgetStateRepository,
 ) *TransactionService {
 	return &TransactionService{
 		transactionRepo: transactionRepo,
 		accountRepo:     accountRepo,
 		categoryRepo:    categoryRepo,
+		allocationRepo:  allocationRepo,
 		budgetStateRepo: budgetStateRepo,
 	}
 }
 
 // CreateTransaction creates a new transaction and updates account balance
-// Positive amount = inflow (adds to account) - category optional
-// Negative amount = outflow (subtracts from account) - category required
+// Handles three types of transactions:
+// 1. Normal income (positive amount): Increases account and Ready to Assign
+// 2. Normal expense (negative amount): Decreases account, requires category
+// 3. Credit card expense: Decreases card balance, moves budget from expense category to payment category
 func (s *TransactionService) CreateTransaction(ctx context.Context, accountID string, categoryID *string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
 	// Validate account exists
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -60,6 +65,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 
 	transaction := &domain.Transaction{
 		ID:          uuid.New().String(),
+		Type:        domain.TransactionTypeNormal,
 		AccountID:   accountID,
 		CategoryID:  categoryID,
 		Amount:      amount,
@@ -82,9 +88,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		return nil, fmt.Errorf("failed to update account balance: %w", err)
 	}
 
-	// If this is an income transaction (positive amount), increase Ready to Assign
-	// Backend coordinates this automatically!
+	// Handle different transaction types
 	if amount > 0 {
+		// INCOME: Increase Ready to Assign
 		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, amount); err != nil {
 			// Rollback if Ready to Assign update fails
 			s.accountRepo.Update(ctx, &domain.Account{
@@ -95,9 +101,156 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 			s.transactionRepo.Delete(ctx, transaction.ID)
 			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
 		}
+	} else if account.Type == domain.AccountTypeCredit && categoryID != nil {
+		// CREDIT CARD SPENDING: Move budgeted money from expense category to payment category
+		// Get the payment category for this credit card
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
+		if err != nil {
+			// Rollback
+			s.accountRepo.Update(ctx, &domain.Account{
+				ID:        account.ID,
+				Balance:   account.Balance - amount,
+				UpdatedAt: time.Now(),
+			})
+			s.transactionRepo.Delete(ctx, transaction.ID)
+			return nil, fmt.Errorf("failed to get payment category: %w", err)
+		}
+
+		// Get current period (YYYY-MM format)
+		period := date.Format("2006-01")
+
+		// Get or create allocation for payment category
+		paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
+		if err != nil {
+			// Create new allocation
+			paymentAlloc = &domain.Allocation{
+				ID:         uuid.New().String(),
+				CategoryID: paymentCategory.ID,
+				Amount:     -amount, // Negative amount becomes positive allocation
+				Period:     period,
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			}
+			if err := s.allocationRepo.Create(ctx, paymentAlloc); err != nil {
+				// Rollback
+				s.accountRepo.Update(ctx, &domain.Account{
+					ID:        account.ID,
+					Balance:   account.Balance - amount,
+					UpdatedAt: time.Now(),
+				})
+				s.transactionRepo.Delete(ctx, transaction.ID)
+				return nil, fmt.Errorf("failed to create payment allocation: %w", err)
+			}
+		} else {
+			// Update existing allocation
+			paymentAlloc.Amount += -amount // Add the spending amount
+			paymentAlloc.UpdatedAt = time.Now()
+			if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
+				// Rollback
+				s.accountRepo.Update(ctx, &domain.Account{
+					ID:        account.ID,
+					Balance:   account.Balance - amount,
+					UpdatedAt: time.Now(),
+				})
+				s.transactionRepo.Delete(ctx, transaction.ID)
+				return nil, fmt.Errorf("failed to update payment allocation: %w", err)
+			}
+		}
+		// Note: We don't decrease Ready to Assign because the money was already allocated
+		// to the expense category. The allocation just moved from expense → payment category.
 	}
+	// For regular expense on non-credit accounts, no special handling needed
+	// The money was allocated to the expense category and is now spent
 
 	return transaction, nil
+}
+
+// CreateTransfer creates a transfer between two accounts
+// Transfers move money between accounts without affecting Ready to Assign
+// Amount should be positive (the amount to transfer)
+func (s *TransactionService) CreateTransfer(ctx context.Context, fromAccountID, toAccountID string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
+	if amount <= 0 {
+		return nil, fmt.Errorf("transfer amount must be positive")
+	}
+
+	if fromAccountID == toAccountID {
+		return nil, fmt.Errorf("cannot transfer to the same account")
+	}
+
+	// Validate both accounts exist
+	fromAccount, err := s.accountRepo.GetByID(ctx, fromAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("source account not found: %w", err)
+	}
+
+	toAccount, err := s.accountRepo.GetByID(ctx, toAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("destination account not found: %w", err)
+	}
+
+	// Create outbound transaction (negative) from source account
+	outboundTxn := &domain.Transaction{
+		ID:                  uuid.New().String(),
+		Type:                domain.TransactionTypeTransfer,
+		AccountID:           fromAccountID,
+		TransferToAccountID: &toAccountID,
+		Amount:              -amount, // Negative for outbound
+		Description:         description,
+		Date:                date,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+
+	if err := s.transactionRepo.Create(ctx, outboundTxn); err != nil {
+		return nil, err
+	}
+
+	// Create inbound transaction (positive) on destination account
+	inboundTxn := &domain.Transaction{
+		ID:                  uuid.New().String(),
+		Type:                domain.TransactionTypeTransfer,
+		AccountID:           toAccountID,
+		TransferToAccountID: &fromAccountID, // Link back to source
+		Amount:              amount, // Positive for inbound
+		Description:         description,
+		Date:                date,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+
+	if err := s.transactionRepo.Create(ctx, inboundTxn); err != nil {
+		// Rollback outbound transaction
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, err
+	}
+
+	// Update source account balance (decrease)
+	fromAccount.Balance -= amount
+	fromAccount.UpdatedAt = time.Now()
+	if err := s.accountRepo.Update(ctx, fromAccount); err != nil {
+		// Rollback both transactions
+		s.transactionRepo.Delete(ctx, inboundTxn.ID)
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, fmt.Errorf("failed to update source account balance: %w", err)
+	}
+
+	// Update destination account balance (increase)
+	toAccount.Balance += amount
+	toAccount.UpdatedAt = time.Now()
+	if err := s.accountRepo.Update(ctx, toAccount); err != nil {
+		// Rollback everything
+		fromAccount.Balance += amount // Restore source balance
+		s.accountRepo.Update(ctx, fromAccount)
+		s.transactionRepo.Delete(ctx, inboundTxn.ID)
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, fmt.Errorf("failed to update destination account balance: %w", err)
+	}
+
+	// Note: We DON'T adjust Ready to Assign because the money just moved between accounts
+	// Total money in the system is the same
+
+	// Return the outbound transaction (the one initiated by the user)
+	return outboundTxn, nil
 }
 
 // GetTransaction retrieves a transaction by ID
