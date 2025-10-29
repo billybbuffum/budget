@@ -15,6 +15,7 @@ import (
 type ImportService struct {
 	transactionRepo domain.TransactionRepository
 	accountRepo     domain.AccountRepository
+	budgetStateRepo domain.BudgetStateRepository
 	ofxParser       *ofx.Parser
 }
 
@@ -22,11 +23,13 @@ type ImportService struct {
 func NewImportService(
 	transactionRepo domain.TransactionRepository,
 	accountRepo domain.AccountRepository,
+	budgetStateRepo domain.BudgetStateRepository,
 	ofxParser *ofx.Parser,
 ) *ImportService {
 	return &ImportService{
 		transactionRepo: transactionRepo,
 		accountRepo:     accountRepo,
+		budgetStateRepo: budgetStateRepo,
 		ofxParser:       ofxParser,
 	}
 }
@@ -49,7 +52,7 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
-	// Parse OFX file
+	// Parse OFX file (extracts ledger balance + last 90 days of transactions)
 	parseResult, err := s.ofxParser.Parse(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse OFX file: %w", err)
@@ -63,14 +66,27 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 		ImportedTransactionIDs: []string{},
 	}
 
-	// Track balance changes
-	balanceChange := int64(0)
+	// Calculate balance delta using ledger balance from OFX file
+	// This is the authoritative balance from the bank
+	balanceDelta := int64(0)
+	if parseResult.LedgerBalance != 0 {
+		balanceDelta = parseResult.LedgerBalance - account.Balance
+	}
 
-	// Process each transaction
+	// Process each transaction (for categorization purposes only)
+	// These transactions do NOT affect account balance since we're using ledger balance
 	for _, ofxTxn := range parseResult.Transactions {
+		// Normalize date to midnight UTC to ensure consistent comparison
+		normalizedDate := time.Date(
+			ofxTxn.Date.Year(),
+			ofxTxn.Date.Month(),
+			ofxTxn.Date.Day(),
+			0, 0, 0, 0,
+			time.UTC,
+		)
+
 		// Check for duplicate
-		dateStr := ofxTxn.Date.Format(time.RFC3339)
-		existing, err := s.transactionRepo.FindDuplicate(ctx, accountID, dateStr, ofxTxn.Amount, ofxTxn.Description)
+		existing, err := s.transactionRepo.FindDuplicate(ctx, accountID, normalizedDate, ofxTxn.Amount, ofxTxn.Description)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("error checking duplicate for transaction: %v", err))
 			continue
@@ -88,7 +104,7 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 			CategoryID:  nil, // Imported transactions start uncategorized
 			Amount:      ofxTxn.Amount,
 			Description: ofxTxn.Description,
-			Date:        ofxTxn.Date,
+			Date:        normalizedDate,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}
@@ -100,12 +116,13 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 
 		result.ImportedTransactions++
 		result.ImportedTransactionIDs = append(result.ImportedTransactionIDs, transaction.ID)
-		balanceChange += ofxTxn.Amount
 	}
 
-	// Update account balance if any transactions were imported
-	if result.ImportedTransactions > 0 {
-		account.Balance += balanceChange
+	// Update account balance to match OFX ledger balance (if available)
+	// and adjust Ready to Assign by the balance delta
+	if parseResult.LedgerBalance != 0 {
+		oldBalance := account.Balance
+		account.Balance = parseResult.LedgerBalance
 		account.UpdatedAt = time.Now()
 
 		if err := s.accountRepo.Update(ctx, account); err != nil {
@@ -114,6 +131,21 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 				s.transactionRepo.Delete(ctx, txnID)
 			}
 			return nil, fmt.Errorf("failed to update account balance: %w", err)
+		}
+
+		// Adjust Ready to Assign by the balance delta only
+		// This prevents double-counting when users have manually entered balances
+		// Delta = New Balance - Old Balance
+		// Example: OFX says $7,895.39, account had $0 -> add $7,895.39 to Ready to Assign
+		// Example: OFX says $7,895.39, account had $10,000 -> subtract $2,104.61 from Ready to Assign
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balanceDelta); err != nil {
+			// Rollback: delete imported transactions and reverse account balance
+			for _, txnID := range result.ImportedTransactionIDs {
+				s.transactionRepo.Delete(ctx, txnID)
+			}
+			account.Balance = oldBalance
+			s.accountRepo.Update(ctx, account)
+			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
 		}
 	}
 

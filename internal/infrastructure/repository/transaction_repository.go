@@ -198,11 +198,14 @@ func (r *transactionRepository) ListUncategorized(ctx context.Context) ([]*domai
 	return r.scanTransactions(rows)
 }
 
-func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID string, date string, amount int64, description string) (*domain.Transaction, error) {
+func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID string, date time.Time, amount int64, description string) (*domain.Transaction, error) {
 	query := `
 		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
 		FROM transactions
-		WHERE account_id = ? AND date = ? AND amount = ? AND description = ?
+		WHERE account_id = ?
+			AND date(date) = date(?)
+			AND amount = ?
+			AND description = ?
 		LIMIT 1
 	`
 	transaction := &domain.Transaction{}

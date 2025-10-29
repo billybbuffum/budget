@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // AccountRepository defines the interface for account data operations
 type AccountRepository interface {
@@ -32,7 +35,7 @@ type TransactionRepository interface {
 	ListByPeriod(ctx context.Context, startDate, endDate string) ([]*Transaction, error)
 	ListUncategorized(ctx context.Context) ([]*Transaction, error)
 	GetCategoryActivity(ctx context.Context, categoryID, period string) (int64, error)
-	FindDuplicate(ctx context.Context, accountID string, date string, amount int64, description string) (*Transaction, error)
+	FindDuplicate(ctx context.Context, accountID string, date time.Time, amount int64, description string) (*Transaction, error)
 	Update(ctx context.Context, transaction *Transaction) error
 	BulkUpdateCategory(ctx context.Context, transactionIDs []string, categoryID *string) error
 	Delete(ctx context.Context, id string) error
