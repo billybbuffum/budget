@@ -196,7 +196,13 @@ async function loadBudgetView() {
                         <div class="flex gap-6 items-center">
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Allocated</div>
-                                <div class="font-semibold">${formatCurrency(allocated)}</div>
+                                <div
+                                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
+                                    title="Click to edit allocation"
+                                >
+                                    ${formatCurrency(allocated)}
+                                </div>
                             </div>
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Spent</div>
@@ -206,9 +212,6 @@ async function loadBudgetView() {
                                 <div class="text-xs text-gray-500">Available</div>
                                 <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                             </div>
-                            <button onclick="showAllocateModal('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})" class="btn-primary text-sm whitespace-nowrap">
-                                ${allocated > 0 ? 'Edit' : 'Allocate'}
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -421,6 +424,88 @@ function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
     document.getElementById('allocation-amount').value = (currentAmount / 100).toFixed(2);
     document.getElementById('allocation-notes').value = '';
     showModal('allocation-modal');
+}
+
+// Inline editing for budget allocation
+async function startInlineEdit(categoryId, categoryName, currentAmount) {
+    // Find the element that was clicked
+    const clickedElement = event.target;
+    const container = clickedElement.parentElement;
+
+    // Store original content
+    const originalContent = clickedElement.innerHTML;
+
+    // Create input element
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '0.01';
+    input.min = '0';
+    input.value = (currentAmount / 100).toFixed(2);
+    input.className = 'w-24 border border-blue-500 rounded px-2 py-1 text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+    // Replace content with input
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    // Function to save the allocation
+    const saveAllocation = async () => {
+        const newAmount = parseFloat(input.value);
+
+        if (isNaN(newAmount) || newAmount < 0) {
+            showToast('Please enter a valid amount', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        const amountInCents = Math.round(newAmount * 100);
+
+        // Only save if the amount changed
+        if (amountInCents !== currentAmount) {
+            try {
+                const period = getCurrentPeriod();
+                await apiCall('/allocations', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        category_id: categoryId,
+                        amount: amountInCents,
+                        period,
+                        notes: ''
+                    })
+                });
+
+                showToast('Allocation updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update allocation:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    // Function to cancel editing
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    // Handle Enter key to save
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveAllocation();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    // Handle click outside to save
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveAllocation(), 100);
+    });
 }
 
 // Form submissions
