@@ -93,6 +93,8 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name string, c
 }
 
 // DeleteCategory deletes a category
+// NOTE: Consider implementing soft delete in the future to preserve history
+// For now, foreign key constraints prevent deletion if transactions/allocations exist
 func (s *CategoryService) DeleteCategory(ctx context.Context, id string) error {
 	return s.categoryRepo.Delete(ctx, id)
 }
