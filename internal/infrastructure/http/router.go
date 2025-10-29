@@ -8,10 +8,10 @@ import (
 
 // NewRouter creates and configures the HTTP router
 func NewRouter(
-	userHandler *handlers.UserHandler,
+	accountHandler *handlers.AccountHandler,
 	categoryHandler *handlers.CategoryHandler,
 	transactionHandler *handlers.TransactionHandler,
-	budgetHandler *handlers.BudgetHandler,
+	allocationHandler *handlers.AllocationHandler,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -21,12 +21,13 @@ func NewRouter(
 		w.Write([]byte("OK"))
 	})
 
-	// User routes
-	mux.HandleFunc("POST /api/users", userHandler.CreateUser)
-	mux.HandleFunc("GET /api/users", userHandler.ListUsers)
-	mux.HandleFunc("GET /api/users/{id}", userHandler.GetUser)
-	mux.HandleFunc("PUT /api/users/{id}", userHandler.UpdateUser)
-	mux.HandleFunc("DELETE /api/users/{id}", userHandler.DeleteUser)
+	// Account routes
+	mux.HandleFunc("POST /api/accounts", accountHandler.CreateAccount)
+	mux.HandleFunc("GET /api/accounts", accountHandler.ListAccounts)
+	mux.HandleFunc("GET /api/accounts/summary", accountHandler.GetSummary)
+	mux.HandleFunc("GET /api/accounts/{id}", accountHandler.GetAccount)
+	mux.HandleFunc("PUT /api/accounts/{id}", accountHandler.UpdateAccount)
+	mux.HandleFunc("DELETE /api/accounts/{id}", accountHandler.DeleteAccount)
 
 	// Category routes
 	mux.HandleFunc("POST /api/categories", categoryHandler.CreateCategory)
@@ -42,13 +43,13 @@ func NewRouter(
 	mux.HandleFunc("PUT /api/transactions/{id}", transactionHandler.UpdateTransaction)
 	mux.HandleFunc("DELETE /api/transactions/{id}", transactionHandler.DeleteTransaction)
 
-	// Budget routes
-	mux.HandleFunc("POST /api/budgets", budgetHandler.CreateBudget)
-	mux.HandleFunc("GET /api/budgets", budgetHandler.ListBudgets)
-	mux.HandleFunc("GET /api/budgets/summary", budgetHandler.GetBudgetSummary)
-	mux.HandleFunc("GET /api/budgets/{id}", budgetHandler.GetBudget)
-	mux.HandleFunc("PUT /api/budgets/{id}", budgetHandler.UpdateBudget)
-	mux.HandleFunc("DELETE /api/budgets/{id}", budgetHandler.DeleteBudget)
+	// Allocation routes
+	mux.HandleFunc("POST /api/allocations", allocationHandler.CreateAllocation)
+	mux.HandleFunc("GET /api/allocations", allocationHandler.ListAllocations)
+	mux.HandleFunc("GET /api/allocations/summary", allocationHandler.GetAllocationSummary)
+	mux.HandleFunc("GET /api/allocations/ready-to-assign", allocationHandler.GetReadyToAssign)
+	mux.HandleFunc("GET /api/allocations/{id}", allocationHandler.GetAllocation)
+	mux.HandleFunc("DELETE /api/allocations/{id}", allocationHandler.DeleteAllocation)
 
 	return mux
 }
