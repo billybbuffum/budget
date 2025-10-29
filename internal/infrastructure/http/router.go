@@ -15,6 +15,10 @@ func NewRouter(
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
+	// Serve static files
+	fs := http.FileServer(http.Dir("./static"))
+	mux.Handle("/", fs)
+
 	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

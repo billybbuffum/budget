@@ -36,6 +36,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/budget-server .
 
+# Copy static files from builder
+COPY --from=builder /app/static ./static
+
 # Create directory for database with proper permissions
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
 
