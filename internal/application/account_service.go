@@ -11,12 +11,16 @@ import (
 
 // AccountService handles account-related business logic
 type AccountService struct {
-	accountRepo domain.AccountRepository
+	accountRepo     domain.AccountRepository
+	budgetStateRepo domain.BudgetStateRepository
 }
 
 // NewAccountService creates a new account service
-func NewAccountService(accountRepo domain.AccountRepository) *AccountService {
-	return &AccountService{accountRepo: accountRepo}
+func NewAccountService(accountRepo domain.AccountRepository, budgetStateRepo domain.BudgetStateRepository) *AccountService {
+	return &AccountService{
+		accountRepo:     accountRepo,
+		budgetStateRepo: budgetStateRepo,
+	}
 }
 
 // CreateAccount creates a new account
@@ -44,6 +48,16 @@ func (s *AccountService) CreateAccount(ctx context.Context, name string, balance
 		return nil, err
 	}
 
+	// If account has a starting balance, add it to Ready to Assign
+	// This represents money in accounts that hasn't been assigned to categories yet
+	if balance != 0 {
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
+			// Rollback account creation if Ready to Assign update fails
+			s.accountRepo.Delete(ctx, account.ID)
+			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
+	}
+
 	return account, nil
 }
 
@@ -68,6 +82,10 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id, name string, bal
 		account.Name = name
 	}
 
+	// Calculate the delta if balance is changing
+	oldBalance := account.Balance
+	balanceDelta := balance - oldBalance
+
 	// Allow updating balance to any value (including negative for credit cards potentially)
 	account.Balance = balance
 
@@ -86,12 +104,39 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id, name string, bal
 		return nil, err
 	}
 
+	// Adjust Ready to Assign by the balance delta
+	// If balance increased, increase Ready to Assign; if decreased, decrease it
+	if balanceDelta != 0 {
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balanceDelta); err != nil {
+			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
+	}
+
 	return account, nil
 }
 
-// DeleteAccount deletes an account
+// DeleteAccount deletes an account and adjusts Ready to Assign
 func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
-	return s.accountRepo.Delete(ctx, id)
+	// Get the account first to know its balance
+	account, err := s.accountRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Delete the account
+	if err := s.accountRepo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	// Subtract the account balance from Ready to Assign
+	// This represents money that no longer exists in any account
+	if account.Balance != 0 {
+		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -account.Balance); err != nil {
+			return fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // GetTotalBalance returns the sum of all account balances
