@@ -36,6 +36,7 @@ type TransactionRepository interface {
 	ListUncategorized(ctx context.Context) ([]*Transaction, error)
 	GetCategoryActivity(ctx context.Context, categoryID, period string) (int64, error)
 	FindDuplicate(ctx context.Context, accountID string, date time.Time, amount int64, description string) (*Transaction, error)
+	FindByFitID(ctx context.Context, accountID string, fitID string) (*Transaction, error)
 	Update(ctx context.Context, transaction *Transaction) error
 	BulkUpdateCategory(ctx context.Context, transactionIDs []string, categoryID *string) error
 	Delete(ctx context.Context, id string) error

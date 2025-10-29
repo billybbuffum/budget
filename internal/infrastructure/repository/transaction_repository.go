@@ -20,12 +20,12 @@ func NewTransactionRepository(db *sql.DB) domain.TransactionRepository {
 
 func (r *transactionRepository) Create(ctx context.Context, transaction *domain.Transaction) error {
 	query := `
-		INSERT INTO transactions (id, account_id, category_id, amount, description, date, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (id, account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		transaction.ID, transaction.AccountID, transaction.CategoryID,
-		transaction.Amount, transaction.Description, transaction.Date,
+		transaction.Amount, transaction.Description, transaction.Date, transaction.FitID,
 		transaction.CreatedAt, transaction.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create transaction: %w", err)
@@ -35,15 +35,16 @@ func (r *transactionRepository) Create(ctx context.Context, transaction *domain.
 
 func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE id = ?
 	`
 	transaction := &domain.Transaction{}
 	var categoryID sql.NullString
+	var fitID sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&transaction.ID, &transaction.AccountID, &categoryID,
-		&transaction.Amount, &transaction.Description, &transaction.Date,
+		&transaction.Amount, &transaction.Description, &transaction.Date, &fitID,
 		&transaction.CreatedAt, &transaction.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("transaction not found")
@@ -54,12 +55,15 @@ func (r *transactionRepository) GetByID(ctx context.Context, id string) (*domain
 	if categoryID.Valid {
 		transaction.CategoryID = &categoryID.String
 	}
+	if fitID.Valid {
+		transaction.FitID = &fitID.String
+	}
 	return transaction, nil
 }
 
 func (r *transactionRepository) List(ctx context.Context) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		ORDER BY date DESC
 	`
@@ -74,7 +78,7 @@ func (r *transactionRepository) List(ctx context.Context) ([]*domain.Transaction
 
 func (r *transactionRepository) ListByAccount(ctx context.Context, accountID string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE account_id = ?
 		ORDER BY date DESC
@@ -90,7 +94,7 @@ func (r *transactionRepository) ListByAccount(ctx context.Context, accountID str
 
 func (r *transactionRepository) ListByCategory(ctx context.Context, categoryID string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE category_id = ?
 		ORDER BY date DESC
@@ -106,7 +110,7 @@ func (r *transactionRepository) ListByCategory(ctx context.Context, categoryID s
 
 func (r *transactionRepository) ListByPeriod(ctx context.Context, startDate, endDate string) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE date >= ? AND date <= ?
 		ORDER BY date DESC
@@ -147,12 +151,12 @@ func (r *transactionRepository) GetCategoryActivity(ctx context.Context, categor
 func (r *transactionRepository) Update(ctx context.Context, transaction *domain.Transaction) error {
 	query := `
 		UPDATE transactions
-		SET account_id = ?, category_id = ?, amount = ?, description = ?, date = ?, updated_at = ?
+		SET account_id = ?, category_id = ?, amount = ?, description = ?, date = ?, fitid = ?, updated_at = ?
 		WHERE id = ?
 	`
 	result, err := r.db.ExecContext(ctx, query,
 		transaction.AccountID, transaction.CategoryID, transaction.Amount,
-		transaction.Description, transaction.Date, transaction.UpdatedAt, transaction.ID)
+		transaction.Description, transaction.Date, transaction.FitID, transaction.UpdatedAt, transaction.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update transaction: %w", err)
 	}
@@ -184,7 +188,7 @@ func (r *transactionRepository) Delete(ctx context.Context, id string) error {
 
 func (r *transactionRepository) ListUncategorized(ctx context.Context) ([]*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE category_id IS NULL
 		ORDER BY date DESC
@@ -200,7 +204,7 @@ func (r *transactionRepository) ListUncategorized(ctx context.Context) ([]*domai
 
 func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID string, date time.Time, amount int64, description string) (*domain.Transaction, error) {
 	query := `
-		SELECT id, account_id, category_id, amount, description, date, created_at, updated_at
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
 		FROM transactions
 		WHERE account_id = ?
 			AND date(date) = date(?)
@@ -210,9 +214,10 @@ func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID str
 	`
 	transaction := &domain.Transaction{}
 	var categoryID sql.NullString
+	var fitID sql.NullString
 	err := r.db.QueryRowContext(ctx, query, accountID, date, amount, description).Scan(
 		&transaction.ID, &transaction.AccountID, &categoryID,
-		&transaction.Amount, &transaction.Description, &transaction.Date,
+		&transaction.Amount, &transaction.Description, &transaction.Date, &fitID,
 		&transaction.CreatedAt, &transaction.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil // No duplicate found
@@ -222,6 +227,39 @@ func (r *transactionRepository) FindDuplicate(ctx context.Context, accountID str
 	}
 	if categoryID.Valid {
 		transaction.CategoryID = &categoryID.String
+	}
+	if fitID.Valid {
+		transaction.FitID = &fitID.String
+	}
+	return transaction, nil
+}
+
+// FindByFitID finds a transaction by account ID and FitID (for OFX import duplicate detection)
+func (r *transactionRepository) FindByFitID(ctx context.Context, accountID string, fitID string) (*domain.Transaction, error) {
+	query := `
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+		WHERE account_id = ? AND fitid = ?
+		LIMIT 1
+	`
+	transaction := &domain.Transaction{}
+	var categoryID sql.NullString
+	var fitIDNull sql.NullString
+	err := r.db.QueryRowContext(ctx, query, accountID, fitID).Scan(
+		&transaction.ID, &transaction.AccountID, &categoryID,
+		&transaction.Amount, &transaction.Description, &transaction.Date, &fitIDNull,
+		&transaction.CreatedAt, &transaction.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil // No duplicate found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find transaction by fitid: %w", err)
+	}
+	if categoryID.Valid {
+		transaction.CategoryID = &categoryID.String
+	}
+	if fitIDNull.Valid {
+		transaction.FitID = &fitIDNull.String
 	}
 	return transaction, nil
 }
@@ -264,13 +302,17 @@ func (r *transactionRepository) scanTransactions(rows *sql.Rows) ([]*domain.Tran
 	for rows.Next() {
 		transaction := &domain.Transaction{}
 		var categoryID sql.NullString
+		var fitID sql.NullString
 		if err := rows.Scan(&transaction.ID, &transaction.AccountID, &categoryID,
-			&transaction.Amount, &transaction.Description, &transaction.Date,
+			&transaction.Amount, &transaction.Description, &transaction.Date, &fitID,
 			&transaction.CreatedAt, &transaction.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction: %w", err)
 		}
 		if categoryID.Valid {
 			transaction.CategoryID = &categoryID.String
+		}
+		if fitID.Valid {
+			transaction.FitID = &fitID.String
 		}
 		transactions = append(transactions, transaction)
 	}

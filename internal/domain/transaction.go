@@ -12,6 +12,7 @@ type Transaction struct {
 	Amount      int64     `json:"amount"`                  // Amount in cents (positive=inflow, negative=outflow)
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`                    // When the transaction occurred
+	FitID       *string   `json:"fitid,omitempty"`         // Financial Institution Transaction ID (for OFX imports, used for duplicate detection)
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
