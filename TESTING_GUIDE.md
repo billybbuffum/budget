@@ -77,9 +77,11 @@ The budgeting system follows this logic:
 **Expected Results:**
 - ✅ Credit card appears with **negative balance in red**: -$500.00
 - ✅ Total Balance shows $6,500.00 ($7,000 - $500 debt)
-- ✅ Navigate to "Categories" → **"Visa Card Payment" category auto-created** ← **KEY TEST**
-  - Should have red color (#FF6B6B)
-  - Should NOT appear in user-editable categories list (filtered out)
+- ✅ **"Visa Card Payment" category auto-created** ← **KEY TEST**
+  - Should have red/orange color (#FF6B6B)
+  - **VISIBLE in Budget view** with orange background and "(Auto-managed)" label
+  - **NOT visible in Categories management page** (system-managed, not user-editable)
+  - **NOT visible in transaction category dropdown** (cannot be manually assigned)
 
 ---
 
@@ -205,9 +207,12 @@ curl http://localhost:8080/api/categories | jq '.[] | {name, payment_for_account
   - Allocated: $200.00
   - Spent: $50.00
   - Available: $150.00
-- ✅ **"Visa Card Payment" category** (navigate to Budget view, scroll down):
+- ✅ **"Visa Card Payment" category** (navigate to Budget view, visible with other categories):
   - Allocated: **$50.00** ← **AUTO-ALLOCATED** ← **KEY TEST**
   - Available: $50.00
+  - **Orange background** to distinguish from regular categories
+  - Label shows **(Auto-managed)** next to category name
+  - Allocated amount is **not clickable** (hover shows tooltip: "Auto-allocated from credit card spending")
   - **This money "moved" from Gas to Visa Payment automatically**
 
 **What Just Happened:**
@@ -446,7 +451,7 @@ Test that old features still work:
 
 ## Known Behaviors (Not Bugs)
 
-1. **Payment categories don't appear in UI lists** - This is intentional. They're system-managed.
+1. **Payment categories appear in Budget view but not in Categories management or transaction dropdowns** - This is intentional. They're visible in the budget (with orange background and "Auto-managed" label) so you can see money allocated for credit card payments, but hidden from management pages since they're system-controlled.
 
 2. **Transfers don't change Ready to Assign** - Correct! You're just moving money between accounts.
 
