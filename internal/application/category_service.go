@@ -11,12 +11,16 @@ import (
 
 // CategoryService handles category-related business logic
 type CategoryService struct {
-	categoryRepo domain.CategoryRepository
+	categoryRepo   domain.CategoryRepository
+	allocationRepo domain.AllocationRepository
 }
 
 // NewCategoryService creates a new category service
-func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService {
-	return &CategoryService{categoryRepo: categoryRepo}
+func NewCategoryService(categoryRepo domain.CategoryRepository, allocationRepo domain.AllocationRepository) *CategoryService {
+	return &CategoryService{
+		categoryRepo:   categoryRepo,
+		allocationRepo: allocationRepo,
+	}
 }
 
 // CreateCategory creates a new category
@@ -101,8 +105,24 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, descript
 
 // DeleteCategory archives a category (soft delete)
 // Transaction history is preserved with category names intact
-// Allocations are deleted via CASCADE to free up budget
+// Allocations are manually deleted to free up budget (CASCADE doesn't work with soft delete)
 func (s *CategoryService) DeleteCategory(ctx context.Context, id string) error {
+	// Get all allocations for this category
+	allAllocations, err := s.allocationRepo.List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list allocations: %w", err)
+	}
+
+	// Delete allocations for this category
+	for _, alloc := range allAllocations {
+		if alloc.CategoryID == id {
+			if err := s.allocationRepo.Delete(ctx, alloc.ID); err != nil {
+				return fmt.Errorf("failed to delete allocation: %w", err)
+			}
+		}
+	}
+
+	// Archive the category
 	return s.categoryRepo.Delete(ctx, id)
 }
 

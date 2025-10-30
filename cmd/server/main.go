@@ -47,7 +47,7 @@ func main() {
 
 	// Initialize services
 	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo)
-	categoryService := application.NewCategoryService(categoryRepo)
+	categoryService := application.NewCategoryService(categoryRepo, allocationRepo)
 	categoryGroupService := application.NewCategoryGroupService(categoryGroupRepo, categoryRepo)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, allocationRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo, accountRepo)
