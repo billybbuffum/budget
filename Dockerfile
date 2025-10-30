@@ -10,8 +10,9 @@ WORKDIR /app
 # Copy package files for npm
 COPY package.json package-lock.json tailwind.config.js ./
 
-# Install npm dependencies
-RUN npm ci
+# Install npm dependencies with cache mounting for faster installs
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -27,7 +28,11 @@ RUN npx tailwindcss -i static/input.css -o static/styles.css --minify
 
 # Build the application
 # CGO_ENABLED=1 is required for sqlite3
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o budget-server cmd/server/main.go
+# Note: Removed -a flag (forces rebuild of all packages) and -installsuffix (obsolete)
+# Use --mount=type=cache to cache Go build artifacts between builds
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=1 GOOS=linux go build -o budget-server cmd/server/main.go
 
 # Runtime stage
 FROM alpine:latest
