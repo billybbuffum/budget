@@ -32,6 +32,7 @@ func NewRouter(
 	mux.HandleFunc("GET /api/accounts", accountHandler.ListAccounts)
 	mux.HandleFunc("GET /api/accounts/summary", accountHandler.GetSummary)
 	mux.HandleFunc("GET /api/accounts/{id}", accountHandler.GetAccount)
+	mux.HandleFunc("GET /api/accounts/{id}/transactions", transactionHandler.GetAccountTransactions)
 	mux.HandleFunc("PUT /api/accounts/{id}", accountHandler.UpdateAccount)
 	mux.HandleFunc("DELETE /api/accounts/{id}", accountHandler.DeleteAccount)
 

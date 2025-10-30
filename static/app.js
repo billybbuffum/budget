@@ -141,50 +141,14 @@ async function loadReadyToAssign() {
 
 async function loadAllocationSummary() {
     const period = getCurrentPeriod();
-    return await apiCall(`/allocations/summary?period=${period}`) || { ready_to_assign: 0, categories: [] };
+    return await apiCall(`/allocations/summary?period=${period}`) || [];
 }
 
 async function loadAccountSummary() {
     return await apiCall('/accounts/summary');
 }
 
-// View management
-function showView(viewName) {
-    // Update navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.view === viewName) {
-            item.classList.add('active');
-        }
-    });
-
-    // Hide all views
-    document.querySelectorAll('.view').forEach(view => {
-        view.classList.add('hidden');
-    });
-
-    // Show selected view
-    const viewElement = document.getElementById(`${viewName}-view`);
-    if (viewElement) {
-        viewElement.classList.remove('hidden');
-    }
-
-    // Load data for the view
-    switch(viewName) {
-        case 'budget':
-            loadBudgetView();
-            break;
-        case 'accounts':
-            loadAccountsView();
-            break;
-        case 'transactions':
-            loadTransactionsView();
-            break;
-        case 'import':
-            loadImportView();
-            break;
-    }
-}
+// View management - REMOVED (Budget is now the only main view)
 
 // Budget view
 async function loadBudgetView() {
@@ -200,11 +164,30 @@ async function loadBudgetView() {
 
         // Update Ready to Assign display with appropriate color
         const readyToAssignEl = document.getElementById('ready-to-assign');
+        const readyToAssignBox = document.getElementById('ready-to-assign-box');
+        const readyToAssignCheckmark = document.getElementById('ready-to-assign-checkmark');
+        const readyToAssignMessage = document.getElementById('ready-to-assign-message');
+
         readyToAssignEl.textContent = formatCurrency(readyToAssign);
-        if (readyToAssign < 0) {
-            readyToAssignEl.className = 'text-3xl font-bold text-red-600';
+
+        if (readyToAssign === 0) {
+            // All money assigned - show green with checkmark
+            readyToAssignEl.className = 'text-3xl font-bold text-green-600 dark:text-green-400';
+            readyToAssignBox.className = 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl text-green-600 dark:text-green-400';
+            readyToAssignMessage.textContent = 'All money assigned - good to go!';
+        } else if (readyToAssign < 0) {
+            // Overspent - show red
+            readyToAssignEl.className = 'text-3xl font-bold text-red-600 dark:text-red-400';
+            readyToAssignBox.className = 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl hidden';
+            readyToAssignMessage.textContent = 'Over-allocated! Adjust your budget.';
         } else {
-            readyToAssignEl.className = 'text-3xl font-bold text-blue-600';
+            // Has money to assign - show blue
+            readyToAssignEl.className = 'text-3xl font-bold text-blue-600 dark:text-blue-400';
+            readyToAssignBox.className = 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl hidden';
+            readyToAssignMessage.textContent = 'Money available to allocate to categories';
         }
 
         const budgetCategories = document.getElementById('budget-categories');
@@ -213,7 +196,7 @@ async function loadBudgetView() {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
                     <p class="text-gray-500 dark:text-gray-400 mb-4">No expense categories yet.</p>
-                    <button onclick="showView('categories')" class="btn-primary">Create Your First Category</button>
+                    <button onclick="showAddCategoryModal()" class="btn-primary">Create Your First Category</button>
                 </div>
             `;
             return;
@@ -290,7 +273,7 @@ function renderGroupSection(group, groupCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -306,7 +289,7 @@ function renderUngroupedSection(ungroupedCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline(null, event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -342,31 +325,26 @@ function renderBudgetCategory(category, summary) {
                    title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category group border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-white dark:bg-gray-800'} cursor-move"
+        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
              data-category-id="${category.id}">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
-                    <div class="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 dark:hover:ring-blue-600 no-drag"
-                         style="background-color: ${category.color || '#3b82f6'}"
-                         onclick="event.stopPropagation(); showColorPicker('${category.id}', '${category.color || '#3b82f6'}');"
-                         title="Click to change color"></div>
+                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                     <div class="flex-1">
-                        <div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1 no-drag inline-block"
-                             onclick="event.stopPropagation(); startCategoryNameEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}')"
-                             title="Click to edit name">${category.name}</div>
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
-                    <div class="text-right w-24">
+                    <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
-                    <div class="text-right w-24">
+                    <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
-                    <div class="text-right w-24">
+                    <div class="text-right min-w-[100px]">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
                         <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                     </div>
@@ -476,6 +454,180 @@ async function deleteGroup(groupId) {
     }
 }
 
+// Inline category management functions
+function showAddCategoryInline(groupId, event) {
+    // Normalize groupId - convert "null" string or null to empty string
+    const normalizedGroupId = (groupId && groupId !== 'null') ? groupId : '';
+
+    const colors = [
+        { hex: '#f97316', name: 'Orange' },
+        { hex: '#3b82f6', name: 'Blue' },
+        { hex: '#10b981', name: 'Green' },
+        { hex: '#a855f7', name: 'Purple' },
+        { hex: '#ef4444', name: 'Red' },
+        { hex: '#ec4899', name: 'Pink' },
+        { hex: '#eab308', name: 'Yellow' },
+        { hex: '#6366f1', name: 'Indigo' },
+        { hex: '#14b8a6', name: 'Teal' },
+        { hex: '#6b7280', name: 'Gray' }
+    ];
+
+    const colorButtons = colors.map(color =>
+        `<button type="button" onclick="selectInlineColor('${color.hex}')"
+                 class="inline-color-btn w-6 h-6 rounded-full hover:ring-2 hover:ring-blue-400 transition"
+                 style="background-color: ${color.hex}"
+                 data-color="${color.hex}"
+                 title="${color.name}"></button>`
+    ).join('');
+
+    const groupSelector = normalizedGroupId
+        ? `<input type="hidden" id="inline-category-group" value="${normalizedGroupId}">`
+        : `<input type="hidden" id="inline-category-group" value="">`;
+
+    const formHtml = `
+        <div id="inline-category-form" class="bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-lg p-4 mt-2">
+            <h4 class="font-semibold mb-3 text-gray-800 dark:text-gray-100">Add New Category</h4>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Name *</label>
+                    <input type="text" id="inline-category-name" class="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="Category name" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Color</label>
+                    <div class="flex gap-2 flex-wrap">
+                        ${colorButtons}
+                    </div>
+                    <input type="hidden" id="inline-category-color" value="#3b82f6">
+                </div>
+                ${groupSelector}
+                <div class="flex gap-2">
+                    <button type="button" onclick="saveInlineCategory()" class="btn-primary text-sm">Add Category</button>
+                    <button type="button" onclick="cancelInlineCategory()" class="btn-secondary text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove any existing form
+    const existing = document.getElementById('inline-category-form');
+    if (existing) existing.remove();
+
+    // Find the right place to insert the form
+    const targetButton = event ? event.target : document.querySelector(`button[onclick*="showAddCategoryInline"]`);
+    if (targetButton) {
+        targetButton.insertAdjacentHTML('beforebegin', formHtml);
+    } else {
+        // Fallback: append to the appropriate group container
+        const targetContainer = normalizedGroupId
+            ? document.querySelector(`.group-categories[data-group-id="${normalizedGroupId}"]`)
+            : document.querySelector('.group-categories[data-group-id="ungrouped"]');
+        if (targetContainer) {
+            targetContainer.insertAdjacentHTML('afterend', formHtml);
+        }
+    }
+
+    // Focus on name input
+    setTimeout(() => {
+        const nameInput = document.getElementById('inline-category-name');
+        if (nameInput) nameInput.focus();
+    }, 50);
+
+    // Highlight default color
+    selectInlineColor('#3b82f6');
+}
+
+function selectInlineColor(color) {
+    // Remove selection from all buttons
+    document.querySelectorAll('.inline-color-btn').forEach(btn => {
+        btn.classList.remove('ring-2', 'ring-blue-600', 'dark:ring-blue-400');
+    });
+
+    // Add selection to clicked button
+    const selectedBtn = document.querySelector(`.inline-color-btn[data-color="${color}"]`);
+    if (selectedBtn) {
+        selectedBtn.classList.add('ring-2', 'ring-blue-600', 'dark:ring-blue-400');
+    }
+
+    // Update hidden input
+    const colorInput = document.getElementById('inline-category-color');
+    if (colorInput) {
+        colorInput.value = color;
+    }
+}
+
+async function saveInlineCategory() {
+    const name = document.getElementById('inline-category-name').value.trim();
+    const color = document.getElementById('inline-category-color').value;
+    const groupId = document.getElementById('inline-category-group').value;
+
+    if (!name) {
+        showToast('Please enter a category name', 'error');
+        return;
+    }
+
+    try {
+        const categoryData = {
+            name,
+            color,
+            description: ''
+        };
+
+        const newCategory = await apiCall('/categories', {
+            method: 'POST',
+            body: JSON.stringify(categoryData)
+        });
+
+        // If group is specified, assign category to group
+        // Check for valid group ID (not empty string and not the string "null")
+        if (groupId && groupId !== '' && groupId !== 'null' && newCategory.id) {
+            await apiCall('/category-groups/assign', {
+                method: 'POST',
+                body: JSON.stringify({
+                    category_id: newCategory.id,
+                    group_id: groupId
+                })
+            });
+        }
+
+        showToast('Category added!');
+        cancelInlineCategory();
+        await loadCategories();
+        await loadBudgetView();
+    } catch (error) {
+        console.error('Failed to add category:', error);
+        showToast('Failed to add category', 'error');
+    }
+}
+
+function cancelInlineCategory() {
+    const form = document.getElementById('inline-category-form');
+    if (form) form.remove();
+}
+
+async function deleteCategory(categoryId, categoryName) {
+    if (!confirm(`Delete category "${categoryName}"?\n\nThis will remove the category and unassign it from all transactions.`)) {
+        return;
+    }
+
+    try {
+        await apiCall(`/categories/${categoryId}`, { method: 'DELETE' });
+        showToast('Category deleted!');
+        await loadCategories();
+        await loadBudgetView();
+        await loadSidebar(); // Refresh sidebar to update recent transactions
+    } catch (error) {
+        console.error('Failed to delete category:', error);
+        showToast('Failed to delete category', 'error');
+    }
+}
+
+// Make functions globally available
+window.showAddCategoryInline = showAddCategoryInline;
+window.selectInlineColor = selectInlineColor;
+window.saveInlineCategory = saveInlineCategory;
+window.cancelInlineCategory = cancelInlineCategory;
+window.deleteCategory = deleteCategory;
+
 // Accounts view
 async function loadAccountsView() {
     try {
@@ -582,6 +734,75 @@ async function loadTransactionsView() {
     }
 }
 
+// Categories view
+async function loadCategoriesView() {
+    try {
+        await loadCategories();
+
+        // Filter out payment categories (auto-created for credit cards)
+        const userCategories = categories.filter(c => !c.payment_for_account_id);
+        const categoriesList = document.getElementById('categories-list');
+
+        if (userCategories.length === 0) {
+            categoriesList.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No categories yet.</div>';
+        } else {
+            // Show flat list of categories (groups are managed on budget page)
+            categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load categories view:', error);
+    }
+}
+
+function renderCategoriesByGroups(categoriesList, groups) {
+    let html = '';
+
+    // Render groups with their categories
+    for (const group of groups) {
+        const groupCategories = categoriesList.filter(c => c.group_id === group.id);
+        if (groupCategories.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">${group.name}</h3>
+                    ${group.description ? `<p class="text-sm text-gray-500 mb-3">${group.description}</p>` : ''}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${groupCategories.map(category => renderCategoryCard(category)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Render ungrouped categories
+    const ungroupedCategories = categoriesList.filter(c => !c.group_id);
+    if (ungroupedCategories.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Ungrouped</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${ungroupedCategories.map(category => renderCategoryCard(category)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return html || '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
+}
+
+function renderCategoryCard(category) {
+    return `
+        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3">
+                <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
+                <div class="flex-1">
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                    ${category.description ? `<div class="text-sm text-gray-500 dark:text-gray-400">${category.description}</div>` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 // Month navigation
 function changeMonth(delta) {
     currentMonth.setMonth(currentMonth.getMonth() + delta);
@@ -603,13 +824,13 @@ async function showAddTransactionModal() {
 
     if (accounts.length === 0) {
         showToast('Please create an account first', 'error');
-        showView('accounts');
+        showAddAccountModal();
         return;
     }
 
     if (categories.length === 0) {
         showToast('Please create a category first', 'error');
-        showView('categories');
+        showAddCategoryModal();
         return;
     }
 
@@ -658,6 +879,23 @@ async function showAddTransferModal() {
 function showAddAccountModal() {
     document.getElementById('account-form').reset();
     showModal('account-modal');
+}
+
+function showAddCategoryModal() {
+    document.getElementById('category-form').reset();
+
+    // Reset color swatches to default (blue)
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+        swatch.classList.remove('selected');
+        swatch.querySelector('.color-check').classList.add('hidden');
+    });
+    const defaultSwatch = document.querySelector('.color-swatch[data-color="#3b82f6"]');
+    if (defaultSwatch) {
+        defaultSwatch.classList.add('selected');
+        defaultSwatch.querySelector('.color-check').classList.remove('hidden');
+    }
+    document.getElementById('category-color').value = '#3b82f6';
+    showModal('category-modal');
 }
 
 function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
@@ -748,359 +986,6 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     input.addEventListener('blur', () => {
         setTimeout(() => saveAllocation(), 100);
     });
-}
-
-// Inline category name editing
-async function startCategoryNameEdit(categoryId, currentName) {
-    const clickedElement = event.target;
-    const originalContent = clickedElement.innerHTML;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = currentName;
-    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
-
-    clickedElement.innerHTML = '';
-    clickedElement.appendChild(input);
-    input.focus();
-    input.select();
-
-    const saveName = async () => {
-        const newName = input.value.trim();
-
-        if (!newName) {
-            showToast('Category name cannot be empty', 'error');
-            clickedElement.innerHTML = originalContent;
-            return;
-        }
-
-        if (newName !== currentName) {
-            try {
-                await apiCall(`/categories/${categoryId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        name: newName,
-                        color: '', // Will be preserved by backend
-                        description: ''
-                    })
-                });
-
-                showToast('Category name updated!');
-                loadBudgetView();
-            } catch (error) {
-                console.error('Failed to update category name:', error);
-                clickedElement.innerHTML = originalContent;
-            }
-        } else {
-            clickedElement.innerHTML = originalContent;
-        }
-    };
-
-    const cancelEdit = () => {
-        clickedElement.innerHTML = originalContent;
-    };
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            saveName();
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            cancelEdit();
-        }
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(() => saveName(), 100);
-    });
-}
-
-// Delete category with confirmation
-async function deleteCategory(categoryId, categoryName) {
-    if (!confirm(`Delete category "${categoryName}"?\n\nThis will remove the category and unassign it from all transactions.`)) {
-        return;
-    }
-
-    try {
-        await apiCall(`/categories/${categoryId}`, { method: 'DELETE' });
-        showToast('Category deleted!');
-        loadBudgetView();
-    } catch (error) {
-        console.error('Failed to delete category:', error);
-    }
-}
-
-// Show color picker for category
-function showColorPicker(categoryId, currentColor) {
-    const colors = [
-        { hex: '#f97316', name: 'Orange' },
-        { hex: '#3b82f6', name: 'Blue' },
-        { hex: '#10b981', name: 'Green' },
-        { hex: '#a855f7', name: 'Purple' },
-        { hex: '#ef4444', name: 'Red' },
-        { hex: '#ec4899', name: 'Pink' },
-        { hex: '#eab308', name: 'Yellow' },
-        { hex: '#6366f1', name: 'Indigo' },
-        { hex: '#14b8a6', name: 'Teal' },
-        { hex: '#6b7280', name: 'Gray' }
-    ];
-
-    const colorButtons = colors.map(color =>
-        `<button onclick="updateCategoryColor('${categoryId}', '${color.hex}');"
-                 class="w-8 h-8 rounded-full hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition ${color.hex === currentColor ? 'ring-2 ring-blue-600' : ''}"
-                 style="background-color: ${color.hex}"
-                 title="${color.name}"></button>`
-    ).join('');
-
-    const picker = document.createElement('div');
-    picker.id = 'color-picker-popup';
-    picker.className = 'fixed bg-white border-2 border-gray-300 rounded-lg shadow-xl p-4 z-50';
-    picker.style.left = event.pageX + 'px';
-    picker.style.top = event.pageY + 'px';
-    picker.innerHTML = `
-        <div class="mb-2 text-sm font-semibold text-gray-700">Select Color</div>
-        <div class="grid grid-cols-5 gap-2 mb-2">
-            ${colorButtons}
-        </div>
-        <button onclick="closeColorPicker()" class="text-xs text-gray-600 hover:text-gray-800 w-full">Cancel</button>
-    `;
-
-    // Remove any existing picker
-    const existing = document.getElementById('color-picker-popup');
-    if (existing) existing.remove();
-
-    document.body.appendChild(picker);
-
-    // Close on click outside
-    setTimeout(() => {
-        document.addEventListener('click', function closeOnClickOutside(e) {
-            if (!picker.contains(e.target)) {
-                closeColorPicker();
-                document.removeEventListener('click', closeOnClickOutside);
-            }
-        });
-    }, 100);
-}
-
-function closeColorPicker() {
-    const picker = document.getElementById('color-picker-popup');
-    if (picker) picker.remove();
-}
-
-async function updateCategoryColor(categoryId, newColor) {
-    closeColorPicker();
-
-    try {
-        await apiCall(`/categories/${categoryId}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                name: '', // Will be preserved by backend
-                color: newColor,
-                description: ''
-            })
-        });
-
-        showToast('Color updated!');
-        loadBudgetView();
-    } catch (error) {
-        console.error('Failed to update category color:', error);
-    }
-}
-
-// Inline group name editing
-async function startGroupNameEdit(groupId, currentName) {
-    const clickedElement = event.target;
-    const originalContent = clickedElement.innerHTML;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = currentName;
-    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-lg font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
-
-    clickedElement.innerHTML = '';
-    clickedElement.appendChild(input);
-    input.focus();
-    input.select();
-
-    const saveName = async () => {
-        const newName = input.value.trim();
-
-        if (!newName) {
-            showToast('Group name cannot be empty', 'error');
-            clickedElement.innerHTML = originalContent;
-            return;
-        }
-
-        if (newName !== currentName) {
-            try {
-                await apiCall(`/category-groups/${groupId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        name: newName,
-                        description: '',
-                        display_order: 0 // Will be preserved by backend
-                    })
-                });
-
-                showToast('Group name updated!');
-                loadBudgetView();
-            } catch (error) {
-                console.error('Failed to update group name:', error);
-                clickedElement.innerHTML = originalContent;
-            }
-        } else {
-            clickedElement.innerHTML = originalContent;
-        }
-    };
-
-    const cancelEdit = () => {
-        clickedElement.innerHTML = originalContent;
-    };
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            saveName();
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            cancelEdit();
-        }
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(() => saveName(), 100);
-    });
-}
-
-// Show inline form to add category
-function showAddCategoryInline(groupId) {
-    const colors = [
-        { hex: '#f97316', name: 'Orange' },
-        { hex: '#3b82f6', name: 'Blue' },
-        { hex: '#10b981', name: 'Green' },
-        { hex: '#a855f7', name: 'Purple' },
-        { hex: '#ef4444', name: 'Red' },
-        { hex: '#ec4899', name: 'Pink' },
-        { hex: '#eab308', name: 'Yellow' },
-        { hex: '#6366f1', name: 'Indigo' },
-        { hex: '#14b8a6', name: 'Teal' },
-        { hex: '#6b7280', name: 'Gray' }
-    ];
-
-    const colorButtons = colors.map(color =>
-        `<button type="button" onclick="selectInlineColor('${color.hex}')"
-                 class="inline-color-btn w-6 h-6 rounded-full hover:ring-2 hover:ring-blue-400 transition"
-                 style="background-color: ${color.hex}"
-                 data-color="${color.hex}"
-                 title="${color.name}"></button>`
-    ).join('');
-
-    const groupSelector = groupId
-        ? `<input type="hidden" id="inline-category-group" value="${groupId}">`
-        : `<input type="hidden" id="inline-category-group" value="">`;
-
-    const formHtml = `
-        <div id="inline-category-form" class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mt-2">
-            <h4 class="font-semibold mb-3">Add New Category</h4>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Name *</label>
-                    <input type="text" id="inline-category-name" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Category name" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Color</label>
-                    <div class="flex gap-2 flex-wrap">
-                        ${colorButtons}
-                    </div>
-                    <input type="hidden" id="inline-category-color" value="#3b82f6">
-                </div>
-                ${groupSelector}
-                <div class="flex gap-2">
-                    <button type="button" onclick="saveInlineCategory()" class="btn-primary text-sm">Add Category</button>
-                    <button type="button" onclick="cancelInlineCategory()" class="btn-secondary text-sm">Cancel</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Remove any existing form
-    const existing = document.getElementById('inline-category-form');
-    if (existing) existing.remove();
-
-    // Find the right place to insert the form
-    const targetButton = event.target;
-    targetButton.insertAdjacentHTML('beforebegin', formHtml);
-
-    // Focus on name input
-    document.getElementById('inline-category-name').focus();
-
-    // Highlight default color
-    selectInlineColor('#3b82f6');
-}
-
-function selectInlineColor(color) {
-    // Remove selection from all buttons
-    document.querySelectorAll('.inline-color-btn').forEach(btn => {
-        btn.classList.remove('ring-2', 'ring-blue-600');
-    });
-
-    // Add selection to clicked button
-    const selectedBtn = document.querySelector(`.inline-color-btn[data-color="${color}"]`);
-    if (selectedBtn) {
-        selectedBtn.classList.add('ring-2', 'ring-blue-600');
-    }
-
-    // Update hidden input
-    const colorInput = document.getElementById('inline-category-color');
-    if (colorInput) {
-        colorInput.value = color;
-    }
-}
-
-async function saveInlineCategory() {
-    const name = document.getElementById('inline-category-name').value.trim();
-    const color = document.getElementById('inline-category-color').value;
-    const groupId = document.getElementById('inline-category-group').value;
-
-    if (!name) {
-        showToast('Please enter a category name', 'error');
-        return;
-    }
-
-    try {
-        const categoryData = {
-            name,
-            color,
-            description: ''
-        };
-
-        const newCategory = await apiCall('/categories', {
-            method: 'POST',
-            body: JSON.stringify(categoryData)
-        });
-
-        // If group is specified, assign category to group
-        if (groupId && newCategory.id) {
-            await apiCall('/category-groups/assign', {
-                method: 'POST',
-                body: JSON.stringify({
-                    category_id: newCategory.id,
-                    group_id: groupId
-                })
-            });
-        }
-
-        showToast('Category added!');
-        cancelInlineCategory();
-        loadBudgetView();
-    } catch (error) {
-        console.error('Failed to add category:', error);
-    }
-}
-
-function cancelInlineCategory() {
-    const form = document.getElementById('inline-category-form');
-    if (form) form.remove();
 }
 
 // Load uncategorized transactions
@@ -1262,10 +1147,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('transaction-form').reset();
             showToast('Transaction added successfully!');
 
-            // Reload views
-            loadBudgetView();
-            loadAccountsView();
-            loadTransactionsView();
+            // Reload budget and sidebar
+            await loadAccounts();
+            await loadBudgetView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create transaction:', error);
         }
@@ -1310,10 +1195,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('transfer-form').reset();
             showToast('Transfer created successfully!');
 
-            // Reload views (including budget to show payment category updates)
-            loadBudgetView();
-            loadAccountsView();
-            loadTransactionsView();
+            // Reload budget and sidebar (including payment category updates)
+            await loadAccounts();
+            await loadBudgetView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create transfer:', error);
         }
@@ -1341,11 +1226,41 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('account-form').reset();
             showToast('Account created successfully!');
 
-            // Reload accounts
+            // Reload accounts and sidebar
             await loadAccounts();
-            loadAccountsView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create account:', error);
+        }
+    });
+
+    // Category form
+    document.getElementById('category-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('category-name').value;
+        const color = document.getElementById('category-color').value;
+        const description = document.getElementById('category-description').value;
+
+        try {
+            await apiCall('/categories', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    color,
+                    description
+                })
+            });
+
+            closeModal('category-modal');
+            document.getElementById('category-form').reset();
+            showToast('Category created successfully!');
+
+            // Reload categories and budget
+            await loadCategories();
+            await loadBudgetView();
+        } catch (error) {
+            console.error('Failed to create category:', error);
         }
     });
 
@@ -1469,12 +1384,324 @@ document.addEventListener('DOMContentLoaded', function() {
     init();
 });
 
+// ============================================================================
+// NEW SIDEBAR AND PANEL FUNCTIONS
+// ============================================================================
+
+// Render accounts in sidebar
+async function renderAccountsSidebar() {
+    const container = document.getElementById('sidebar-accounts-list');
+    if (!container) return;
+
+    if (accounts.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No accounts yet</p>';
+        return;
+    }
+
+    // Calculate total balance
+    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+    let html = `
+        <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-blue-500 dark:border-blue-400" onclick="loadAccountTransactionsPanel(null)">
+            <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">All Accounts</div>
+            <div class="text-lg font-bold ${totalBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${formatCurrency(totalBalance)}</div>
+        </div>
+    `;
+
+    accounts.forEach(account => {
+        const balanceClass = account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+        html += `
+            <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="loadAccountTransactionsPanel('${account.id}')">
+                <div class="flex justify-between items-start">
+                    <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">${account.name}</div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${account.type}</span>
+                </div>
+                <div class="text-sm font-semibold ${balanceClass}">${formatCurrency(account.balance)}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// Render uncategorized transactions in sidebar
+async function renderUncategorizedTransactions() {
+    const container = document.getElementById('sidebar-uncategorized-list');
+    const countSpan = document.getElementById('uncategorized-count');
+    if (!container) return;
+
+    try {
+        const uncategorized = await apiCall('/transactions?uncategorized=true');
+
+        if (!uncategorized || uncategorized.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">All caught up!</p>';
+            countSpan.textContent = '';
+            return;
+        }
+
+        countSpan.textContent = `(${uncategorized.length})`;
+
+        // Show first 5
+        const toShow = uncategorized.slice(0, 5);
+        let html = '';
+
+        for (const txn of toShow) {
+            const account = accounts.find(a => a.id === txn.account_id);
+            const accountName = account ? account.name : 'Unknown';
+            const desc = txn.description || 'Transaction';
+
+            html += `
+                <div class="text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2">
+                    <div class="font-medium text-gray-900 dark:text-gray-100 truncate" title="${desc}">${desc}</div>
+                    <div class="flex items-center gap-1 mt-1">
+                        <select class="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 flex-1" onchange="quickCategorize('${txn.id}', this.value)">
+                            <option value="">Category...</option>
+                            ${categories.filter(c => !c.payment_for_account_id).map(cat =>
+                                `<option value="${cat.id}">${cat.name}</option>`
+                            ).join('')}
+                        </select>
+                        <span class="text-gray-600 dark:text-gray-400">${formatCurrency(txn.amount)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (uncategorized.length > 5) {
+            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${uncategorized.length - 5} more</p>`;
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load uncategorized transactions:', error);
+        container.innerHTML = '<p class="text-xs text-red-500">Failed to load</p>';
+    }
+}
+
+// Quick categorize from sidebar
+async function quickCategorize(transactionId, categoryId) {
+    if (!categoryId) return;
+
+    try {
+        await apiCall(`/transactions/${transactionId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                category_id: categoryId
+            })
+        });
+
+        showToast('Transaction categorized!');
+
+        // Reload sidebar sections
+        await renderUncategorizedTransactions();
+        await renderRecentTransactions();
+        await loadBudgetView(); // Reload budget to update spending
+    } catch (error) {
+        console.error('Failed to categorize:', error);
+        showToast('Failed to categorize transaction', 'error');
+    }
+}
+
+// Make quickCategorize available globally
+window.quickCategorize = quickCategorize;
+
+// Render recent transactions in sidebar
+async function renderRecentTransactions() {
+    const container = document.getElementById('sidebar-recent-list');
+    if (!container) return;
+
+    try {
+        // Get all transactions and sort by date
+        const allTransactions = await apiCall('/transactions') || [];
+        const recent = allTransactions
+            .filter(t => t.category_id) // Only categorized
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 10);
+
+        if (recent.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No recent activity</p>';
+            return;
+        }
+
+        let html = '';
+        for (const txn of recent) {
+            const category = categories.find(c => c.id === txn.category_id);
+            const desc = txn.description || 'Transaction';
+            const amountClass = txn.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300';
+
+            html += `
+                <div class="text-xs border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-1.5 last:border-b-0">
+                    <div class="flex justify-between items-start">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 truncate flex-1" title="${desc}">${desc}</span>
+                        <span class="${amountClass} font-semibold ml-2">${formatCurrency(txn.amount)}</span>
+                    </div>
+                    <div class="flex items-center gap-1 mt-0.5">
+                        ${category ? `<span class="w-2 h-2 rounded-full" style="background-color: ${category.color}"></span>` : ''}
+                        <span class="text-gray-500 dark:text-gray-400">${category ? category.name : 'Uncategorized'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load recent transactions:', error);
+        container.innerHTML = '<p class="text-xs text-red-500">Failed to load</p>';
+    }
+}
+
+// Load sidebar data
+async function loadSidebar() {
+    await renderAccountsSidebar();
+    await renderUncategorizedTransactions();
+    await renderRecentTransactions();
+}
+
+// Open transaction panel for account
+async function loadAccountTransactionsPanel(accountId) {
+    const panel = document.getElementById('transaction-panel');
+    const backdrop = document.getElementById('transaction-panel-backdrop');
+    const content = document.getElementById('transaction-panel-content');
+    const title = document.getElementById('transaction-panel-title');
+    const subtitle = document.getElementById('transaction-panel-subtitle');
+
+    if (!panel || !backdrop || !content) return;
+
+    try {
+        let transactions;
+        let accountName = 'All Accounts';
+
+        if (accountId) {
+            // Load specific account transactions
+            transactions = await apiCall(`/accounts/${accountId}/transactions`);
+            const account = accounts.find(a => a.id === accountId);
+            if (account) {
+                accountName = account.name;
+                subtitle.textContent = `Balance: ${formatCurrency(account.balance)}`;
+            }
+        } else {
+            // Load all transactions
+            transactions = await apiCall('/transactions');
+            const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+            subtitle.textContent = `Total Balance: ${formatCurrency(totalBalance)}`;
+        }
+
+        title.textContent = accountName;
+
+        // Sort by date descending
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Render transactions
+        if (transactions.length === 0) {
+            content.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No transactions yet</p>';
+        } else {
+            let html = '<div class="space-y-2">';
+
+            transactions.forEach(txn => {
+                const account = accounts.find(a => a.id === txn.account_id);
+                const category = categories.find(c => c.id === txn.category_id);
+                const desc = txn.description || 'Transaction';
+                const amountClass = txn.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300';
+
+                // Check if it's a transfer
+                const isTransfer = txn.type === 'transfer';
+                let displayText = desc;
+                if (isTransfer && txn.transfer_to_account_id) {
+                    const toAccount = accounts.find(a => a.id === txn.transfer_to_account_id);
+                    if (toAccount) {
+                        displayText = txn.amount < 0
+                            ? `Transfer to ${toAccount.name}`
+                            : `Transfer from ${toAccount.name}`;
+                    }
+                }
+
+                html += `
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="font-medium text-gray-900 dark:text-gray-100">${displayText}</div>
+                            <div class="text-lg font-semibold ${amountClass}">${formatCurrency(txn.amount)}</div>
+                        </div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
+                            <div>${formatDate(txn.date)}</div>
+                            ${accountId ? '' : `<div>Account: ${account ? account.name : 'Unknown'}</div>`}
+                            ${category ? `
+                                <div class="flex items-center gap-1">
+                                    <span class="w-3 h-3 rounded-full" style="background-color: ${category.color}"></span>
+                                    <span>${category.name}</span>
+                                </div>
+                            ` : '<div class="text-yellow-600 dark:text-yellow-400">Uncategorized</div>'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        // Show panel
+        backdrop.classList.remove('hidden');
+        panel.classList.remove('translate-x-full');
+    } catch (error) {
+        console.error('Failed to load account transactions:', error);
+        showToast('Failed to load transactions', 'error');
+    }
+}
+
+// Close transaction panel
+function closeTransactionPanel() {
+    const panel = document.getElementById('transaction-panel');
+    const backdrop = document.getElementById('transaction-panel-backdrop');
+
+    if (panel && backdrop) {
+        panel.classList.add('translate-x-full');
+        backdrop.classList.add('hidden');
+    }
+}
+
+// Show import view (modal)
+function showImportView() {
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.add('active');
+        // Populate account dropdown
+        const select = document.getElementById('import-account');
+        if (select) {
+            select.innerHTML = '<option value="">Choose account to import into...</option>';
+            accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = `${account.name} (${account.type})`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+// Close import view
+function closeImportView() {
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// Make functions globally available
+window.loadAccountTransactionsPanel = loadAccountTransactionsPanel;
+window.closeTransactionPanel = closeTransactionPanel;
+window.showImportView = showImportView;
+window.closeImportView = closeImportView;
+
+// ============================================================================
+// END NEW SIDEBAR AND PANEL FUNCTIONS
+// ============================================================================
+
 // Initialize the app
 async function init() {
     try {
         await loadAccounts();
         await loadCategories();
         await loadBudgetView();
+        await loadSidebar(); // Load sidebar data
 
         // Show helpful message if starting fresh
         if (accounts.length === 0 && categories.length === 0) {
