@@ -6,27 +6,34 @@
 @layer components {
   .nav-item {
     @apply px-4 py-2 text-gray-600 hover:bg-gray-100 cursor-pointer rounded-md transition-colors;
+    @apply dark:text-gray-300 dark:hover:bg-gray-700;
   }
   .nav-item.active {
     @apply bg-blue-100 text-blue-700 font-semibold;
+    @apply dark:bg-blue-900 dark:text-blue-300;
   }
   .btn-primary {
     @apply bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium;
+    @apply dark:bg-blue-700 dark:hover:bg-blue-600;
   }
   .btn-secondary {
     @apply bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors font-medium;
+    @apply dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
   }
   .btn-danger {
     @apply bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors font-medium;
+    @apply dark:bg-red-700 dark:hover:bg-red-600;
   }
   .modal {
     @apply hidden fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center;
+    @apply dark:bg-opacity-70;
   }
   .modal.active {
     @apply flex;
   }
   .card {
     @apply bg-white rounded-lg shadow-md p-6;
+    @apply dark:bg-gray-800 dark:shadow-gray-900;
   }
   .toast {
     @apply fixed top-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 z-50;
@@ -36,9 +43,11 @@
   }
   .color-swatch {
     @apply w-12 h-12 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all cursor-pointer relative flex items-center justify-center;
+    @apply dark:border-gray-600 dark:hover:border-gray-500;
   }
   .color-swatch.selected {
     @apply border-gray-700 ring-2 ring-gray-400;
+    @apply dark:border-gray-400 dark:ring-gray-500;
   }
   .color-check {
     @apply text-white font-bold text-lg drop-shadow-md;

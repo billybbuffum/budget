@@ -5,6 +5,35 @@ let categories = [];
 let transactions = [];
 let allocations = [];
 
+// Theme management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        updateThemeIcon('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+        updateThemeIcon('light');
+    }
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    const theme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+    updateThemeIcon(theme);
+}
+
+function updateThemeIcon(theme) {
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+        icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+}
+
 // Utility functions
 function formatCurrency(cents) {
     return new Intl.NumberFormat('en-US', {
@@ -672,6 +701,9 @@ async function loadImportView() {
 
 // Form submissions
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize theme
+    initializeTheme();
+
     // Add listener for transaction type change to update category requirement
     document.getElementById('transaction-type').addEventListener('change', function() {
         const categorySelect = document.getElementById('transaction-category');
