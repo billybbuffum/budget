@@ -400,6 +400,29 @@ Potential features to consider:
 
 ## Notes for Claude
 
+### Git Configuration
+**IMPORTANT:** All commits in this repository must be attributed to the repository owner, not Claude.
+
+Before making any commits, verify and set the git configuration:
+
+```bash
+# Check current configuration
+git config user.name
+git config user.email
+
+# If not set correctly, configure it:
+git config user.name "billybbuffum"
+git config user.email "billybbuffum@users.noreply.github.com"
+```
+
+**Required git author for all commits:**
+- Name: `billybbuffum`
+- Email: `billybbuffum@users.noreply.github.com`
+
+This configuration should be automatically read from `.git/config`, but if it's not working in your session, manually set it using the commands above before making any commits.
+
+### Budget Application Guidelines
+
 - Always use cents for money amounts (INTEGER in database)
 - Allocations only work with expense categories
 - One allocation per category per period (upsert behavior)
