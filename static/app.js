@@ -148,46 +148,7 @@ async function loadAccountSummary() {
     return await apiCall('/accounts/summary');
 }
 
-// View management
-function showView(viewName) {
-    // Update navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.view === viewName) {
-            item.classList.add('active');
-        }
-    });
-
-    // Hide all views
-    document.querySelectorAll('.view').forEach(view => {
-        view.classList.add('hidden');
-    });
-
-    // Show selected view
-    const viewElement = document.getElementById(`${viewName}-view`);
-    if (viewElement) {
-        viewElement.classList.remove('hidden');
-    }
-
-    // Load data for the view
-    switch(viewName) {
-        case 'budget':
-            loadBudgetView();
-            break;
-        case 'accounts':
-            loadAccountsView();
-            break;
-        case 'transactions':
-            loadTransactionsView();
-            break;
-        case 'import':
-            loadImportView();
-            break;
-        case 'categories':
-            loadCategoriesView();
-            break;
-    }
-}
+// View management - REMOVED (Budget is now the only main view)
 
 // Budget view
 async function loadBudgetView() {
@@ -956,10 +917,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('transaction-form').reset();
             showToast('Transaction added successfully!');
 
-            // Reload views
-            loadBudgetView();
-            loadAccountsView();
-            loadTransactionsView();
+            // Reload budget and sidebar
+            await loadAccounts();
+            await loadBudgetView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create transaction:', error);
         }
@@ -1004,10 +965,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('transfer-form').reset();
             showToast('Transfer created successfully!');
 
-            // Reload views (including budget to show payment category updates)
-            loadBudgetView();
-            loadAccountsView();
-            loadTransactionsView();
+            // Reload budget and sidebar (including payment category updates)
+            await loadAccounts();
+            await loadBudgetView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create transfer:', error);
         }
@@ -1035,9 +996,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('account-form').reset();
             showToast('Account created successfully!');
 
-            // Reload accounts
+            // Reload accounts and sidebar
             await loadAccounts();
-            loadAccountsView();
+            await loadSidebar();
         } catch (error) {
             console.error('Failed to create account:', error);
         }
@@ -1065,10 +1026,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('category-form').reset();
             showToast('Category created successfully!');
 
-            // Reload categories
+            // Reload categories and budget
             await loadCategories();
-            loadCategoriesView();
-            loadBudgetView();
+            await loadBudgetView();
         } catch (error) {
             console.error('Failed to create category:', error);
         }
@@ -1194,12 +1154,324 @@ document.addEventListener('DOMContentLoaded', function() {
     init();
 });
 
+// ============================================================================
+// NEW SIDEBAR AND PANEL FUNCTIONS
+// ============================================================================
+
+// Render accounts in sidebar
+async function renderAccountsSidebar() {
+    const container = document.getElementById('sidebar-accounts-list');
+    if (!container) return;
+
+    if (accounts.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No accounts yet</p>';
+        return;
+    }
+
+    // Calculate total balance
+    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+    let html = `
+        <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-blue-500 dark:border-blue-400" onclick="loadAccountTransactionsPanel(null)">
+            <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">All Accounts</div>
+            <div class="text-lg font-bold ${totalBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">${formatCurrency(totalBalance)}</div>
+        </div>
+    `;
+
+    accounts.forEach(account => {
+        const balanceClass = account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+        html += `
+            <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="loadAccountTransactionsPanel('${account.id}')">
+                <div class="flex justify-between items-start">
+                    <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">${account.name}</div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${account.type}</span>
+                </div>
+                <div class="text-sm font-semibold ${balanceClass}">${formatCurrency(account.balance)}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// Render uncategorized transactions in sidebar
+async function renderUncategorizedTransactions() {
+    const container = document.getElementById('sidebar-uncategorized-list');
+    const countSpan = document.getElementById('uncategorized-count');
+    if (!container) return;
+
+    try {
+        const uncategorized = await apiCall('/transactions?uncategorized=true');
+
+        if (!uncategorized || uncategorized.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">All caught up!</p>';
+            countSpan.textContent = '';
+            return;
+        }
+
+        countSpan.textContent = `(${uncategorized.length})`;
+
+        // Show first 5
+        const toShow = uncategorized.slice(0, 5);
+        let html = '';
+
+        for (const txn of toShow) {
+            const account = accounts.find(a => a.id === txn.account_id);
+            const accountName = account ? account.name : 'Unknown';
+            const desc = txn.description || 'Transaction';
+
+            html += `
+                <div class="text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2">
+                    <div class="font-medium text-gray-900 dark:text-gray-100 truncate" title="${desc}">${desc}</div>
+                    <div class="flex items-center gap-1 mt-1">
+                        <select class="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 flex-1" onchange="quickCategorize('${txn.id}', this.value)">
+                            <option value="">Category...</option>
+                            ${categories.filter(c => !c.payment_for_account_id).map(cat =>
+                                `<option value="${cat.id}">${cat.name}</option>`
+                            ).join('')}
+                        </select>
+                        <span class="text-gray-600 dark:text-gray-400">${formatCurrency(txn.amount)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (uncategorized.length > 5) {
+            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${uncategorized.length - 5} more</p>`;
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load uncategorized transactions:', error);
+        container.innerHTML = '<p class="text-xs text-red-500">Failed to load</p>';
+    }
+}
+
+// Quick categorize from sidebar
+async function quickCategorize(transactionId, categoryId) {
+    if (!categoryId) return;
+
+    try {
+        await apiCall(`/transactions/${transactionId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                category_id: categoryId
+            })
+        });
+
+        showToast('Transaction categorized!');
+
+        // Reload sidebar sections
+        await renderUncategorizedTransactions();
+        await renderRecentTransactions();
+        await loadBudgetView(); // Reload budget to update spending
+    } catch (error) {
+        console.error('Failed to categorize:', error);
+        showToast('Failed to categorize transaction', 'error');
+    }
+}
+
+// Make quickCategorize available globally
+window.quickCategorize = quickCategorize;
+
+// Render recent transactions in sidebar
+async function renderRecentTransactions() {
+    const container = document.getElementById('sidebar-recent-list');
+    if (!container) return;
+
+    try {
+        // Get all transactions and sort by date
+        const allTransactions = await apiCall('/transactions');
+        const recent = allTransactions
+            .filter(t => t.category_id) // Only categorized
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 10);
+
+        if (recent.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No recent activity</p>';
+            return;
+        }
+
+        let html = '';
+        for (const txn of recent) {
+            const category = categories.find(c => c.id === txn.category_id);
+            const desc = txn.description || 'Transaction';
+            const amountClass = txn.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300';
+
+            html += `
+                <div class="text-xs border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-1.5 last:border-b-0">
+                    <div class="flex justify-between items-start">
+                        <span class="font-medium text-gray-900 dark:text-gray-100 truncate flex-1" title="${desc}">${desc}</span>
+                        <span class="${amountClass} font-semibold ml-2">${formatCurrency(txn.amount)}</span>
+                    </div>
+                    <div class="flex items-center gap-1 mt-0.5">
+                        ${category ? `<span class="w-2 h-2 rounded-full" style="background-color: ${category.color}"></span>` : ''}
+                        <span class="text-gray-500 dark:text-gray-400">${category ? category.name : 'Uncategorized'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load recent transactions:', error);
+        container.innerHTML = '<p class="text-xs text-red-500">Failed to load</p>';
+    }
+}
+
+// Load sidebar data
+async function loadSidebar() {
+    await renderAccountsSidebar();
+    await renderUncategorizedTransactions();
+    await renderRecentTransactions();
+}
+
+// Open transaction panel for account
+async function loadAccountTransactionsPanel(accountId) {
+    const panel = document.getElementById('transaction-panel');
+    const backdrop = document.getElementById('transaction-panel-backdrop');
+    const content = document.getElementById('transaction-panel-content');
+    const title = document.getElementById('transaction-panel-title');
+    const subtitle = document.getElementById('transaction-panel-subtitle');
+
+    if (!panel || !backdrop || !content) return;
+
+    try {
+        let transactions;
+        let accountName = 'All Accounts';
+
+        if (accountId) {
+            // Load specific account transactions
+            transactions = await apiCall(`/accounts/${accountId}/transactions`);
+            const account = accounts.find(a => a.id === accountId);
+            if (account) {
+                accountName = account.name;
+                subtitle.textContent = `Balance: ${formatCurrency(account.balance)}`;
+            }
+        } else {
+            // Load all transactions
+            transactions = await apiCall('/transactions');
+            const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+            subtitle.textContent = `Total Balance: ${formatCurrency(totalBalance)}`;
+        }
+
+        title.textContent = accountName;
+
+        // Sort by date descending
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Render transactions
+        if (transactions.length === 0) {
+            content.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No transactions yet</p>';
+        } else {
+            let html = '<div class="space-y-2">';
+
+            transactions.forEach(txn => {
+                const account = accounts.find(a => a.id === txn.account_id);
+                const category = categories.find(c => c.id === txn.category_id);
+                const desc = txn.description || 'Transaction';
+                const amountClass = txn.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300';
+
+                // Check if it's a transfer
+                const isTransfer = txn.type === 'transfer';
+                let displayText = desc;
+                if (isTransfer && txn.transfer_to_account_id) {
+                    const toAccount = accounts.find(a => a.id === txn.transfer_to_account_id);
+                    if (toAccount) {
+                        displayText = txn.amount < 0
+                            ? `Transfer to ${toAccount.name}`
+                            : `Transfer from ${toAccount.name}`;
+                    }
+                }
+
+                html += `
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="font-medium text-gray-900 dark:text-gray-100">${displayText}</div>
+                            <div class="text-lg font-semibold ${amountClass}">${formatCurrency(txn.amount)}</div>
+                        </div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
+                            <div>${formatDate(txn.date)}</div>
+                            ${accountId ? '' : `<div>Account: ${account ? account.name : 'Unknown'}</div>`}
+                            ${category ? `
+                                <div class="flex items-center gap-1">
+                                    <span class="w-3 h-3 rounded-full" style="background-color: ${category.color}"></span>
+                                    <span>${category.name}</span>
+                                </div>
+                            ` : '<div class="text-yellow-600 dark:text-yellow-400">Uncategorized</div>'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        // Show panel
+        backdrop.classList.remove('hidden');
+        panel.classList.remove('translate-x-full');
+    } catch (error) {
+        console.error('Failed to load account transactions:', error);
+        showToast('Failed to load transactions', 'error');
+    }
+}
+
+// Close transaction panel
+function closeTransactionPanel() {
+    const panel = document.getElementById('transaction-panel');
+    const backdrop = document.getElementById('transaction-panel-backdrop');
+
+    if (panel && backdrop) {
+        panel.classList.add('translate-x-full');
+        backdrop.classList.add('hidden');
+    }
+}
+
+// Show import view (modal)
+function showImportView() {
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.add('active');
+        // Populate account dropdown
+        const select = document.getElementById('import-account');
+        if (select) {
+            select.innerHTML = '<option value="">Choose account to import into...</option>';
+            accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = `${account.name} (${account.type})`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+// Close import view
+function closeImportView() {
+    const modal = document.getElementById('import-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+// Make functions globally available
+window.loadAccountTransactionsPanel = loadAccountTransactionsPanel;
+window.closeTransactionPanel = closeTransactionPanel;
+window.showImportView = showImportView;
+window.closeImportView = closeImportView;
+
+// ============================================================================
+// END NEW SIDEBAR AND PANEL FUNCTIONS
+// ============================================================================
+
 // Initialize the app
 async function init() {
     try {
         await loadAccounts();
         await loadCategories();
         await loadBudgetView();
+        await loadSidebar(); // Load sidebar data
 
         // Show helpful message if starting fresh
         if (accounts.length === 0 && categories.length === 0) {

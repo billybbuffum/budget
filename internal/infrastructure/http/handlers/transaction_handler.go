@@ -195,3 +195,20 @@ func (h *TransactionHandler) BulkCategorizeTransactions(w http.ResponseWriter, r
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *TransactionHandler) GetAccountTransactions(w http.ResponseWriter, r *http.Request) {
+	accountID := r.PathValue("id")
+	if accountID == "" {
+		http.Error(w, "account id is required", http.StatusBadRequest)
+		return
+	}
+
+	transactions, err := h.transactionService.ListTransactionsByAccount(r.Context(), accountID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(transactions)
+}
