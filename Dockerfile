@@ -1,11 +1,17 @@
 # Build stage
 FROM golang:1.23-alpine AS builder
 
-# Install build dependencies (gcc, musl-dev needed for sqlite3)
-RUN apk add --no-cache gcc musl-dev
+# Install build dependencies (gcc, musl-dev needed for sqlite3, nodejs and npm for tailwind)
+RUN apk add --no-cache gcc musl-dev nodejs npm
 
 # Set working directory
 WORKDIR /app
+
+# Copy package files for npm
+COPY package.json package-lock.json tailwind.config.js ./
+
+# Install npm dependencies
+RUN npm ci
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -15,6 +21,9 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Build Tailwind CSS
+RUN npx tailwindcss -i static/input.css -o static/styles.css --minify
 
 # Build the application
 # CGO_ENABLED=1 is required for sqlite3

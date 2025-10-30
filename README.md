@@ -54,4 +54,8 @@ This app is perfect for anyone who wants to:
 
 ## License
 
-MIT
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+**In short**: You're free to use, modify, and share this software for any **noncommercial purpose** (personal use, education, research, hobby projects, etc.). If you want to use it commercially, please contact the project owner for a commercial license.
+
+For the full license terms, see the [LICENSE](LICENSE) file.

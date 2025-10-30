@@ -10,6 +10,7 @@
 budget-server
 budget-app
 bin/
+budget
 
 # Test binary, built with `go test -c`
 *.test
@@ -34,6 +35,9 @@ go.work.sum
 *.db
 *.sqlite
 *.sqlite3
+
+# Log files
+*.log
 
 # Editor/IDE
 # .idea/

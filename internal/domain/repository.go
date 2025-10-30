@@ -19,8 +19,8 @@ type AccountRepository interface {
 type CategoryRepository interface {
 	Create(ctx context.Context, category *Category) error
 	GetByID(ctx context.Context, id string) (*Category, error)
+	GetPaymentCategoryByAccountID(ctx context.Context, accountID string) (*Category, error)
 	List(ctx context.Context) ([]*Category, error)
-	ListByType(ctx context.Context, categoryType CategoryType) ([]*Category, error)
 	ListByGroup(ctx context.Context, groupID string) ([]*Category, error)
 	Update(ctx context.Context, category *Category) error
 	Delete(ctx context.Context, id string) error

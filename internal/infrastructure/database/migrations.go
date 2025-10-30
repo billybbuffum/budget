@@ -30,7 +30,19 @@ var migrations = []Migration{
 		Down:        rollbackAddFitID,
 	},
 	{
-		Version:     "003_add_category_groups",
+		Version:     "003_deprecate_ready_to_assign",
+		Description: "Deprecate ready_to_assign field - now calculated per period instead of global singleton",
+		Up:          migrateDeprecateReadyToAssign,
+		Down:        rollbackDeprecateReadyToAssign,
+	},
+	{
+		Version:     "004_add_credit_card_support",
+		Description: "Add type and transfer_to_account_id columns for credit card and transfer support",
+		Up:          migrateAddCreditCardSupport,
+		Down:        rollbackAddCreditCardSupport,
+	},
+	{
+		Version:     "005_add_category_groups",
 		Description: "Add category_groups table and group_id to categories for organizing categories into groups",
 		Up:          migrateAddCategoryGroups,
 		Down:        rollbackAddCategoryGroups,
@@ -322,6 +334,37 @@ func rollbackAddFitID(db *sql.DB) error {
 	return nil
 }
 
+// migrateDeprecateReadyToAssign sets ready_to_assign to 0 as it's now calculated per-period
+func migrateDeprecateReadyToAssign(db *sql.DB) error {
+	// Just reset the value to 0 - the field will remain for backward compatibility
+	// but won't be used. Ready to Assign is now calculated per period.
+	_, err := db.Exec(`
+		UPDATE budget_state
+		SET ready_to_assign = 0, updated_at = datetime('now')
+		WHERE id = 'singleton'
+	`)
+	return err
+}
+
+// rollbackDeprecateReadyToAssign would need to recalculate ready_to_assign from data
+func rollbackDeprecateReadyToAssign(db *sql.DB) error {
+	// Recalculate ready_to_assign as: Total Account Balance - Total Allocated + Total Spent
+	_, err := db.Exec(`
+		UPDATE budget_state
+		SET ready_to_assign = (
+			SELECT COALESCE(SUM(balance), 0) FROM accounts
+		) - (
+			SELECT COALESCE(
+				(SELECT COALESCE(SUM(amount), 0) FROM allocations) -
+				(SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE amount < 0),
+			0)
+		),
+		updated_at = datetime('now')
+		WHERE id = 'singleton'
+	`)
+	return err
+}
+
 // migrateAddCategoryGroups creates the category_groups table and adds group_id to categories
 func migrateAddCategoryGroups(db *sql.DB) error {
 	tx, err := db.Begin()
@@ -330,7 +373,7 @@ func migrateAddCategoryGroups(db *sql.DB) error {
 	}
 	defer tx.Rollback()
 
-	// Create category_groups table
+	// Step 1: Create category_groups table
 	_, err = tx.Exec(`
 		CREATE TABLE IF NOT EXISTS category_groups (
 			id TEXT PRIMARY KEY,
@@ -346,50 +389,25 @@ func migrateAddCategoryGroups(db *sql.DB) error {
 		return fmt.Errorf("failed to create category_groups table: %w", err)
 	}
 
-	// Create new categories table with group_id column
-	_, err = tx.Exec(`
-		CREATE TABLE categories_new (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
-			description TEXT,
-			color TEXT,
-			group_id TEXT,
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL,
-			FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE SET NULL
-		)
-	`)
+	// Step 2: Add group_id column to categories (if it doesn't exist)
+	// Check if column exists first
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='group_id'").Scan(&columnExists)
 	if err != nil {
-		return fmt.Errorf("failed to create new categories table: %w", err)
+		return fmt.Errorf("failed to check if group_id exists: %w", err)
 	}
 
-	// Copy all data from old table to new table (group_id will be NULL initially)
-	_, err = tx.Exec(`
-		INSERT INTO categories_new (id, name, type, description, color, group_id, created_at, updated_at)
-		SELECT id, name, type, description, color, NULL, created_at, updated_at
-		FROM categories
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to copy data to new categories table: %w", err)
-	}
+	if columnExists == 0 {
+		_, err = tx.Exec("ALTER TABLE categories ADD COLUMN group_id TEXT REFERENCES category_groups(id) ON DELETE SET NULL")
+		if err != nil {
+			return fmt.Errorf("failed to add group_id column: %w", err)
+		}
 
-	// Drop old table
-	_, err = tx.Exec("DROP TABLE categories")
-	if err != nil {
-		return fmt.Errorf("failed to drop old categories table: %w", err)
-	}
-
-	// Rename new table to original name
-	_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
-	if err != nil {
-		return fmt.Errorf("failed to rename new categories table: %w", err)
-	}
-
-	// Create index for group_id
-	_, err = tx.Exec("CREATE INDEX idx_categories_group_id ON categories(group_id)")
-	if err != nil {
-		return fmt.Errorf("failed to create index on group_id: %w", err)
+		// Create index for group_id
+		_, err = tx.Exec("CREATE INDEX IF NOT EXISTS idx_categories_group_id ON categories(group_id)")
+		if err != nil {
+			return fmt.Errorf("failed to create index on group_id: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -407,42 +425,53 @@ func rollbackAddCategoryGroups(db *sql.DB) error {
 	}
 	defer tx.Rollback()
 
-	// Create categories table without group_id column
-	_, err = tx.Exec(`
-		CREATE TABLE categories_new (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
-			description TEXT,
-			color TEXT,
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL
-		)
-	`)
+	// Check if group_id column exists
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='group_id'").Scan(&columnExists)
 	if err != nil {
-		return fmt.Errorf("failed to create new categories table: %w", err)
+		return fmt.Errorf("failed to check if group_id exists: %w", err)
 	}
 
-	// Copy all data from old table to new table (group_id column is dropped)
-	_, err = tx.Exec(`
-		INSERT INTO categories_new (id, name, type, description, color, created_at, updated_at)
-		SELECT id, name, type, description, color, created_at, updated_at
-		FROM categories
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to copy data to new categories table: %w", err)
-	}
+	// If group_id exists, we need to recreate categories table without it
+	if columnExists > 0 {
+		// Create new categories table without group_id column
+		_, err = tx.Exec(`
+			CREATE TABLE categories_new (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				description TEXT,
+				color TEXT,
+				payment_for_account_id TEXT,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL,
+				FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
+			)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create new categories table: %w", err)
+		}
 
-	// Drop old table
-	_, err = tx.Exec("DROP TABLE categories")
-	if err != nil {
-		return fmt.Errorf("failed to drop old categories table: %w", err)
-	}
+		// Copy all data from old table to new table (group_id column is dropped)
+		_, err = tx.Exec(`
+			INSERT INTO categories_new (id, name, description, color, payment_for_account_id, created_at, updated_at)
+			SELECT id, name, description, color, payment_for_account_id, created_at, updated_at
+			FROM categories
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to copy data to new categories table: %w", err)
+		}
 
-	// Rename new table to original name
-	_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
-	if err != nil {
-		return fmt.Errorf("failed to rename new categories table: %w", err)
+		// Drop old table
+		_, err = tx.Exec("DROP TABLE categories")
+		if err != nil {
+			return fmt.Errorf("failed to drop old categories table: %w", err)
+		}
+
+		// Rename new table to original name
+		_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
+		if err != nil {
+			return fmt.Errorf("failed to rename new categories table: %w", err)
+		}
 	}
 
 	// Drop category_groups table
@@ -533,6 +562,170 @@ func RunMigrations(db *sql.DB) error {
 		}
 
 		fmt.Printf("Migration %s completed successfully\n", migration.Version)
+	}
+
+	return nil
+}
+
+// migrateAddCreditCardSupport adds type and transfer_to_account_id columns
+func migrateAddCreditCardSupport(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Step 1: Add payment_for_account_id column to categories (if it doesn't exist)
+	// Check if column exists first
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='payment_for_account_id'").Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check if payment_for_account_id exists: %w", err)
+	}
+
+	if columnExists == 0 {
+		_, err = tx.Exec("ALTER TABLE categories ADD COLUMN payment_for_account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE")
+		if err != nil {
+			return fmt.Errorf("failed to add payment_for_account_id column: %w", err)
+		}
+	}
+
+	// Step 2: Create new transactions table with type and transfer support
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
+			account_id TEXT NOT NULL,
+			transfer_to_account_id TEXT,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Step 3: Copy existing transactions (all as 'normal' type)
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, 'normal', account_id, NULL, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Step 4: Drop old table and rename
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old table: %w", err)
+	}
+
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename table: %w", err)
+	}
+
+	// Step 5: Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackAddCreditCardSupport removes type and transfer_to_account_id columns
+func rollbackAddCreditCardSupport(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check if there are any transfer transactions
+	var count int
+	err = tx.QueryRow("SELECT COUNT(*) FROM transactions WHERE type = 'transfer'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for transfer transactions: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("cannot rollback: %d transfer transactions exist", count)
+	}
+
+	// Create new transactions table without type and transfer_to_account_id
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			account_id TEXT NOT NULL,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Copy all data
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old table: %w", err)
+	}
+
+	// Rename new table
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename table: %w", err)
+	}
+
+	// Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

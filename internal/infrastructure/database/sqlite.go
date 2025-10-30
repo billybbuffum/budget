@@ -44,7 +44,7 @@ func initSchema(db *sql.DB) error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		balance INTEGER NOT NULL,
-		type TEXT NOT NULL CHECK(type IN ('checking', 'savings', 'cash')),
+		type TEXT NOT NULL CHECK(type IN ('checking', 'savings', 'cash', 'credit')),
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL
 	);
@@ -52,23 +52,27 @@ func initSchema(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS categories (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
-		type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
 		description TEXT,
 		color TEXT,
+		payment_for_account_id TEXT,
 		created_at DATETIME NOT NULL,
-		updated_at DATETIME NOT NULL
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS transactions (
 		id TEXT PRIMARY KEY,
+		type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
 		account_id TEXT NOT NULL,
-		category_id TEXT NOT NULL,
+		transfer_to_account_id TEXT,
+		category_id TEXT,
 		amount INTEGER NOT NULL,
 		description TEXT,
 		date DATETIME NOT NULL,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+		FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 		FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 	);
 

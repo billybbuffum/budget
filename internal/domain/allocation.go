@@ -15,8 +15,10 @@ type Allocation struct {
 
 // AllocationSummary provides a summary view of allocation vs actual spending
 type AllocationSummary struct {
-	Allocation *Allocation `json:"allocation"`
-	Category   *Category   `json:"category"`
-	Activity   int64       `json:"activity"`   // Sum of transactions (negative for spending)
-	Available  int64       `json:"available"`  // Allocated + Activity (Activity is negative)
+	Allocation           *Allocation `json:"allocation"`
+	Category             *Category   `json:"category"`
+	Activity             int64       `json:"activity"`              // Sum of transactions (negative for spending)
+	Available            int64       `json:"available"`             // Allocated + Activity (Activity is negative)
+	Underfunded          *int64      `json:"underfunded"`           // For payment categories: amount needed to cover CC balance (nil if not underfunded)
+	UnderfundedCategories []string    `json:"underfunded_categories"` // For payment categories: list of category names that need more allocation
 }
