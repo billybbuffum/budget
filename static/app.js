@@ -206,25 +206,23 @@ function renderBudgetWithGroups(summary) {
     // Sort groups by display order
     const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
 
-    // Render each group
+    // Render each group (including empty ones)
     for (const group of sortedGroups) {
         const groupCategories = categories.filter(c => c.group_id === group.id);
-        if (groupCategories.length > 0) {
-            html += renderGroupSection(group, groupCategories, summary);
-        }
+        html += renderGroupSection(group, groupCategories, summary);
     }
 
-    // Render ungrouped categories
+    // Always render ungrouped section
     const ungroupedCategories = categories.filter(c => !c.group_id);
-    if (ungroupedCategories.length > 0) {
-        html += renderUngroupedSection(ungroupedCategories, summary);
-    }
+    html += renderUngroupedSection(ungroupedCategories, summary);
 
     return html;
 }
 
 function renderGroupSection(group, groupCategories, summary) {
-    const categoriesHtml = groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('');
+    const categoriesHtml = groupCategories.length > 0
+        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : '<div class="text-gray-400 text-sm p-4 border-2 border-dashed border-gray-200 rounded text-center">Drag categories here</div>';
 
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}">
@@ -233,7 +231,7 @@ function renderGroupSection(group, groupCategories, summary) {
                 <h3 class="text-lg font-semibold text-gray-700 flex-1">${group.name}</h3>
                 <button onclick="deleteGroup('${group.id}')" class="text-xs text-red-600 hover:text-red-800">Delete</button>
             </div>
-            <div class="group-categories space-y-2" data-group-id="${group.id}">
+            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
         </div>
@@ -241,12 +239,14 @@ function renderGroupSection(group, groupCategories, summary) {
 }
 
 function renderUngroupedSection(ungroupedCategories, summary) {
-    const categoriesHtml = ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('');
+    const categoriesHtml = ungroupedCategories.length > 0
+        ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : '<div class="text-gray-400 text-sm p-4 border-2 border-dashed border-gray-200 rounded text-center">Drag categories here to ungroup</div>';
 
     return `
         <div class="budget-group mb-4" data-group-id="ungrouped">
             <h3 class="text-lg font-semibold text-gray-500 mb-2 p-2">Ungrouped</h3>
-            <div class="group-categories space-y-2" data-group-id="ungrouped">
+            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
         </div>
