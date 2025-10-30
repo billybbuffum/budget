@@ -19,12 +19,12 @@ func NewCategoryRepository(db *sql.DB) domain.CategoryRepository {
 
 func (r *categoryRepository) Create(ctx context.Context, category *domain.Category) error {
 	query := `
-		INSERT INTO categories (id, name, type, description, color, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO categories (id, name, type, description, color, group_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		category.ID, category.Name, category.Type, category.Description,
-		category.Color, category.CreatedAt, category.UpdatedAt)
+		category.Color, category.GroupID, category.CreatedAt, category.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create category: %w", err)
 	}
@@ -33,14 +33,14 @@ func (r *categoryRepository) Create(ctx context.Context, category *domain.Catego
 
 func (r *categoryRepository) GetByID(ctx context.Context, id string) (*domain.Category, error) {
 	query := `
-		SELECT id, name, type, description, color, created_at, updated_at
+		SELECT id, name, type, description, color, group_id, created_at, updated_at
 		FROM categories
 		WHERE id = ?
 	`
 	category := &domain.Category{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&category.ID, &category.Name, &category.Type, &category.Description,
-		&category.Color, &category.CreatedAt, &category.UpdatedAt)
+		&category.Color, &category.GroupID, &category.CreatedAt, &category.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("category not found")
 	}
@@ -52,7 +52,7 @@ func (r *categoryRepository) GetByID(ctx context.Context, id string) (*domain.Ca
 
 func (r *categoryRepository) List(ctx context.Context) ([]*domain.Category, error) {
 	query := `
-		SELECT id, name, type, description, color, created_at, updated_at
+		SELECT id, name, type, description, color, group_id, created_at, updated_at
 		FROM categories
 		ORDER BY name
 	`
@@ -66,7 +66,7 @@ func (r *categoryRepository) List(ctx context.Context) ([]*domain.Category, erro
 	for rows.Next() {
 		category := &domain.Category{}
 		if err := rows.Scan(&category.ID, &category.Name, &category.Type,
-			&category.Description, &category.Color, &category.CreatedAt, &category.UpdatedAt); err != nil {
+			&category.Description, &category.Color, &category.GroupID, &category.CreatedAt, &category.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan category: %w", err)
 		}
 		categories = append(categories, category)
@@ -76,7 +76,7 @@ func (r *categoryRepository) List(ctx context.Context) ([]*domain.Category, erro
 
 func (r *categoryRepository) ListByType(ctx context.Context, categoryType domain.CategoryType) ([]*domain.Category, error) {
 	query := `
-		SELECT id, name, type, description, color, created_at, updated_at
+		SELECT id, name, type, description, color, group_id, created_at, updated_at
 		FROM categories
 		WHERE type = ?
 		ORDER BY name
@@ -91,7 +91,32 @@ func (r *categoryRepository) ListByType(ctx context.Context, categoryType domain
 	for rows.Next() {
 		category := &domain.Category{}
 		if err := rows.Scan(&category.ID, &category.Name, &category.Type,
-			&category.Description, &category.Color, &category.CreatedAt, &category.UpdatedAt); err != nil {
+			&category.Description, &category.Color, &category.GroupID, &category.CreatedAt, &category.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan category: %w", err)
+		}
+		categories = append(categories, category)
+	}
+	return categories, nil
+}
+
+func (r *categoryRepository) ListByGroup(ctx context.Context, groupID string) ([]*domain.Category, error) {
+	query := `
+		SELECT id, name, type, description, color, group_id, created_at, updated_at
+		FROM categories
+		WHERE group_id = ?
+		ORDER BY name
+	`
+	rows, err := r.db.QueryContext(ctx, query, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list categories by group: %w", err)
+	}
+	defer rows.Close()
+
+	var categories []*domain.Category
+	for rows.Next() {
+		category := &domain.Category{}
+		if err := rows.Scan(&category.ID, &category.Name, &category.Type,
+			&category.Description, &category.Color, &category.GroupID, &category.CreatedAt, &category.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan category: %w", err)
 		}
 		categories = append(categories, category)
@@ -102,12 +127,12 @@ func (r *categoryRepository) ListByType(ctx context.Context, categoryType domain
 func (r *categoryRepository) Update(ctx context.Context, category *domain.Category) error {
 	query := `
 		UPDATE categories
-		SET name = ?, type = ?, description = ?, color = ?, updated_at = ?
+		SET name = ?, type = ?, description = ?, color = ?, group_id = ?, updated_at = ?
 		WHERE id = ?
 	`
 	result, err := r.db.ExecContext(ctx, query,
 		category.Name, category.Type, category.Description,
-		category.Color, category.UpdatedAt, category.ID)
+		category.Color, category.GroupID, category.UpdatedAt, category.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update category: %w", err)
 	}

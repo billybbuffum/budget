@@ -17,17 +17,19 @@ func NewCategoryHandler(categoryService *application.CategoryService) *CategoryH
 }
 
 type CreateCategoryRequest struct {
-	Name        string `json:"name"`
-	Type        string `json:"type"`        // income or expense
-	Description string `json:"description"`
-	Color       string `json:"color"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`        // income or expense
+	Description string  `json:"description"`
+	Color       string  `json:"color"`
+	GroupID     *string `json:"group_id"`
 }
 
 type UpdateCategoryRequest struct {
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Color       string `json:"color"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Color       string  `json:"color"`
+	GroupID     *string `json:"group_id"`
 }
 
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +39,7 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := h.categoryService.CreateCategory(r.Context(), req.Name, domain.CategoryType(req.Type), req.Description, req.Color)
+	category, err := h.categoryService.CreateCategory(r.Context(), req.Name, domain.CategoryType(req.Type), req.Description, req.Color, req.GroupID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -99,7 +101,7 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	category, err := h.categoryService.UpdateCategory(r.Context(), id, req.Name, domain.CategoryType(req.Type), req.Description, req.Color)
+	category, err := h.categoryService.UpdateCategory(r.Context(), id, req.Name, domain.CategoryType(req.Type), req.Description, req.Color, req.GroupID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

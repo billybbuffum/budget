@@ -2,6 +2,7 @@
 let currentMonth = new Date();
 let accounts = [];
 let categories = [];
+let categoryGroups = [];
 let transactions = [];
 let allocations = [];
 
@@ -82,6 +83,11 @@ async function loadAccounts() {
 async function loadCategories() {
     categories = await apiCall('/categories') || [];
     return categories;
+}
+
+async function loadCategoryGroups() {
+    categoryGroups = await apiCall('/category-groups') || [];
+    return categoryGroups;
 }
 
 async function loadTransactions() {
@@ -325,10 +331,12 @@ async function loadTransactionsView() {
 // Categories view
 async function loadCategoriesView() {
     try {
-        await loadCategories();
+        await Promise.all([loadCategories(), loadCategoryGroups()]);
 
         const expenseCategories = categories.filter(c => c.type === 'expense');
         const incomeCategories = categories.filter(c => c.type === 'income');
+        const expenseGroups = categoryGroups.filter(g => g.type === 'expense').sort((a, b) => a.display_order - b.display_order);
+        const incomeGroups = categoryGroups.filter(g => g.type === 'income').sort((a, b) => a.display_order - b.display_order);
 
         const expenseCategoriesList = document.getElementById('expense-categories-list');
         const incomeCategoriesList = document.getElementById('income-categories-list');
@@ -336,17 +344,52 @@ async function loadCategoriesView() {
         if (expenseCategories.length === 0) {
             expenseCategoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No expense categories yet.</div>';
         } else {
-            expenseCategoriesList.innerHTML = expenseCategories.map(category => renderCategoryCard(category)).join('');
+            expenseCategoriesList.innerHTML = renderCategoriesByGroups(expenseCategories, expenseGroups);
         }
 
         if (incomeCategories.length === 0) {
             incomeCategoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No income categories yet.</div>';
         } else {
-            incomeCategoriesList.innerHTML = incomeCategories.map(category => renderCategoryCard(category)).join('');
+            incomeCategoriesList.innerHTML = renderCategoriesByGroups(incomeCategories, incomeGroups);
         }
     } catch (error) {
         console.error('Failed to load categories view:', error);
     }
+}
+
+function renderCategoriesByGroups(categoriesList, groups) {
+    let html = '';
+
+    // Render groups with their categories
+    for (const group of groups) {
+        const groupCategories = categoriesList.filter(c => c.group_id === group.id);
+        if (groupCategories.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">${group.name}</h3>
+                    ${group.description ? `<p class="text-sm text-gray-500 mb-3">${group.description}</p>` : ''}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${groupCategories.map(category => renderCategoryCard(category)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Render ungrouped categories
+    const ungroupedCategories = categoriesList.filter(c => !c.group_id);
+    if (ungroupedCategories.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Ungrouped</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${ungroupedCategories.map(category => renderCategoryCard(category)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return html || '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
 }
 
 function renderCategoryCard(category) {

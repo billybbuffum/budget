@@ -29,6 +29,12 @@ var migrations = []Migration{
 		Up:          migrateAddFitID,
 		Down:        rollbackAddFitID,
 	},
+	{
+		Version:     "003_add_category_groups",
+		Description: "Add category_groups table and group_id to categories for organizing categories into groups",
+		Up:          migrateAddCategoryGroups,
+		Down:        rollbackAddCategoryGroups,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -307,6 +313,142 @@ func rollbackAddFitID(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// migrateAddCategoryGroups creates the category_groups table and adds group_id to categories
+func migrateAddCategoryGroups(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create category_groups table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS category_groups (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
+			description TEXT,
+			display_order INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create category_groups table: %w", err)
+	}
+
+	// Create new categories table with group_id column
+	_, err = tx.Exec(`
+		CREATE TABLE categories_new (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
+			description TEXT,
+			color TEXT,
+			group_id TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new categories table: %w", err)
+	}
+
+	// Copy all data from old table to new table (group_id will be NULL initially)
+	_, err = tx.Exec(`
+		INSERT INTO categories_new (id, name, type, description, color, group_id, created_at, updated_at)
+		SELECT id, name, type, description, color, NULL, created_at, updated_at
+		FROM categories
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data to new categories table: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE categories")
+	if err != nil {
+		return fmt.Errorf("failed to drop old categories table: %w", err)
+	}
+
+	// Rename new table to original name
+	_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
+	if err != nil {
+		return fmt.Errorf("failed to rename new categories table: %w", err)
+	}
+
+	// Create index for group_id
+	_, err = tx.Exec("CREATE INDEX idx_categories_group_id ON categories(group_id)")
+	if err != nil {
+		return fmt.Errorf("failed to create index on group_id: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackAddCategoryGroups removes the category_groups table and group_id from categories
+func rollbackAddCategoryGroups(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create categories table without group_id column
+	_, err = tx.Exec(`
+		CREATE TABLE categories_new (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
+			description TEXT,
+			color TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new categories table: %w", err)
+	}
+
+	// Copy all data from old table to new table (group_id column is dropped)
+	_, err = tx.Exec(`
+		INSERT INTO categories_new (id, name, type, description, color, created_at, updated_at)
+		SELECT id, name, type, description, color, created_at, updated_at
+		FROM categories
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data to new categories table: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE categories")
+	if err != nil {
+		return fmt.Errorf("failed to drop old categories table: %w", err)
+	}
+
+	// Rename new table to original name
+	_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
+	if err != nil {
+		return fmt.Errorf("failed to rename new categories table: %w", err)
+	}
+
+	// Drop category_groups table
+	_, err = tx.Exec("DROP TABLE IF EXISTS category_groups")
+	if err != nil {
+		return fmt.Errorf("failed to drop category_groups table: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

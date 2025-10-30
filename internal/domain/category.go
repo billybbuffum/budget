@@ -19,6 +19,7 @@ type Category struct {
 	Type        CategoryType `json:"type"`        // income or expense
 	Description string       `json:"description"`
 	Color       string       `json:"color"`       // Hex color for UI
+	GroupID     *string      `json:"group_id"`    // Optional reference to category group
 	CreatedAt   time.Time    `json:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at"`
 }

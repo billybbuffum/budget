@@ -10,6 +10,7 @@ import (
 func NewRouter(
 	accountHandler *handlers.AccountHandler,
 	categoryHandler *handlers.CategoryHandler,
+	categoryGroupHandler *handlers.CategoryGroupHandler,
 	transactionHandler *handlers.TransactionHandler,
 	allocationHandler *handlers.AllocationHandler,
 	importHandler *handlers.ImportHandler,
@@ -40,6 +41,15 @@ func NewRouter(
 	mux.HandleFunc("GET /api/categories/{id}", categoryHandler.GetCategory)
 	mux.HandleFunc("PUT /api/categories/{id}", categoryHandler.UpdateCategory)
 	mux.HandleFunc("DELETE /api/categories/{id}", categoryHandler.DeleteCategory)
+
+	// Category Group routes
+	mux.HandleFunc("POST /api/category-groups", categoryGroupHandler.CreateCategoryGroup)
+	mux.HandleFunc("GET /api/category-groups", categoryGroupHandler.ListCategoryGroups)
+	mux.HandleFunc("GET /api/category-groups/{id}", categoryGroupHandler.GetCategoryGroup)
+	mux.HandleFunc("PUT /api/category-groups/{id}", categoryGroupHandler.UpdateCategoryGroup)
+	mux.HandleFunc("DELETE /api/category-groups/{id}", categoryGroupHandler.DeleteCategoryGroup)
+	mux.HandleFunc("POST /api/category-groups/assign", categoryGroupHandler.AssignCategoryToGroup)
+	mux.HandleFunc("POST /api/category-groups/unassign/{id}", categoryGroupHandler.UnassignCategoryFromGroup)
 
 	// Transaction routes
 	mux.HandleFunc("POST /api/transactions", transactionHandler.CreateTransaction)
