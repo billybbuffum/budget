@@ -326,7 +326,9 @@ function renderBudgetCategory(category, summary) {
 
     return `
         <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
-             data-category-id="${category.id}">
+             data-category-id="${category.id}"
+             data-payment-category="${isPaymentCategory}"
+             data-group-id="${category.group_id || 'ungrouped'}">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
@@ -377,6 +379,20 @@ function initializeBudgetDragDrop() {
                 ghostClass: 'opacity-50',
                 filter: '.no-drag',
                 preventOnFilter: false,
+                onMove: function(evt) {
+                    // Prevent moving credit card payment categories out of their group
+                    const isPaymentCategory = evt.dragged.dataset.paymentCategory === 'true';
+                    const currentGroupId = evt.from.dataset.groupId;
+                    const targetGroupId = evt.to.dataset.groupId;
+
+                    if (isPaymentCategory && currentGroupId !== targetGroupId) {
+                        // Show a brief toast message
+                        showToast('Credit card payment categories cannot be moved to other groups', 'error');
+                        return false; // Prevent the move
+                    }
+
+                    return true; // Allow the move
+                },
                 onEnd: async function(evt) {
                     const categoryId = evt.item.dataset.categoryId;
                     const newGroupId = evt.to.dataset.groupId;
