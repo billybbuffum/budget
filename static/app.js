@@ -5,6 +5,7 @@ let categories = [];
 let categoryGroups = [];
 let transactions = [];
 let allocations = [];
+let collapsedGroups = new Set(); // Track which groups are collapsed
 
 // Theme management
 function initializeTheme() {
@@ -202,7 +203,7 @@ async function loadBudgetView() {
             return;
         }
 
-        // Render groups and ungrouped categories
+        // Render category groups
         budgetCategories.innerHTML = renderBudgetWithGroups(summary);
 
         // Initialize drag-and-drop after rendering
@@ -218,20 +219,26 @@ function renderBudgetWithGroups(summary) {
     // Sort groups by display order
     const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
 
+    // Initialize collapsed state: collapse all groups by default on first load
+    if (collapsedGroups.size === 0) {
+        sortedGroups.forEach(group => collapsedGroups.add(group.id));
+    }
+
     // Render each group (including empty ones)
     for (const group of sortedGroups) {
         const groupCategories = categories.filter(c => c.group_id === group.id);
         html += renderGroupSection(group, groupCategories, summary);
     }
 
-    // Always render ungrouped section
-    const ungroupedCategories = categories.filter(c => !c.group_id);
-    html += renderUngroupedSection(ungroupedCategories, summary);
-
     return html;
 }
 
 function renderGroupSection(group, groupCategories, summary) {
+    // Collapsible groups feature
+    const isCollapsed = collapsedGroups.has(group.id);
+    const chevron = isCollapsed ? '▶' : '▼';
+    const contentDisplay = isCollapsed ? 'style="display: none;"' : '';
+
     // Check if this is the Credit Card Payments group (protected from user modifications)
     const isCreditCardPaymentsGroup = group.name === 'Credit Card Payments';
 
@@ -262,9 +269,11 @@ function renderGroupSection(group, groupCategories, summary) {
 
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
-            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
+            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
+                 onclick="toggleGroupCollapse('${group.id}')">
                 <div class="flex items-center gap-3 flex-1">
-                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
+                    <span class="collapse-icon text-gray-600 dark:text-gray-400 select-none" style="font-size: 10px; width: 12px;">${chevron}</span>
+                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition no-drag" title="Drag to reorder" onclick="event.stopPropagation()">⋮⋮</span>
                     <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
                         ${groupNameHtml}
                     </h3>
@@ -277,26 +286,12 @@ function renderGroupSection(group, groupCategories, summary) {
                     ${deleteButtonHtml}
                 </div>
             </div>
-            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
-                ${categoriesHtml}
+            <div class="group-content" ${contentDisplay}>
+                <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
+                    ${categoriesHtml}
+                </div>
+                ${addCategoryButton}
             </div>
-            ${addCategoryButton}
-        </div>
-    `;
-}
-
-function renderUngroupedSection(ungroupedCategories, summary) {
-    const categoriesHtml = ungroupedCategories.length > 0
-        ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here to ungroup</div>';
-
-    return `
-        <div class="budget-group mb-4" data-group-id="ungrouped">
-            <h3 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2 p-2">Ungrouped</h3>
-            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
-                ${categoriesHtml}
-            </div>
-            <button onclick="showAddCategoryInline(null, event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -428,7 +423,7 @@ function initializeBudgetDragDrop() {
                 onEnd: async function(evt) {
                     const categoryId = evt.item.dataset.categoryId;
                     const newGroupId = evt.to.dataset.groupId;
-                    await updateCategoryGroup(categoryId, newGroupId === 'ungrouped' ? null : newGroupId);
+                    await updateCategoryGroup(categoryId, newGroupId);
                 }
             });
         });
@@ -436,7 +431,7 @@ function initializeBudgetDragDrop() {
 }
 
 async function updateGroupOrder() {
-    const groups = [...document.querySelectorAll('.budget-group[data-group-id]:not([data-group-id="ungrouped"])')];
+    const groups = [...document.querySelectorAll('.budget-group[data-group-id]')];
     for (let i = 0; i < groups.length; i++) {
         const groupId = groups[i].dataset.groupId;
         try {
@@ -452,14 +447,15 @@ async function updateGroupOrder() {
 
 async function updateCategoryGroup(categoryId, groupId) {
     try {
-        if (groupId) {
-            await apiCall('/category-groups/assign', {
-                method: 'POST',
-                body: JSON.stringify({ category_id: categoryId, group_id: groupId })
-            });
-        } else {
-            await apiCall(`/category-groups/unassign/${categoryId}`, { method: 'POST' });
+        if (!groupId) {
+            showToast('Categories must belong to a group', 'error');
+            loadBudgetView(); // Reload to reset UI
+            return;
         }
+        await apiCall('/category-groups/assign', {
+            method: 'POST',
+            body: JSON.stringify({ category_id: categoryId, group_id: groupId })
+        });
         showToast('Category moved successfully!');
     } catch (error) {
         console.error('Failed to update category group:', error);
@@ -490,7 +486,7 @@ async function showAddGroupInline() {
 }
 
 async function deleteGroup(groupId) {
-    if (!confirm('Delete this group? Categories will be moved to Ungrouped.')) return;
+    if (!confirm('Delete this group? You must move or delete all categories in this group first.')) return;
 
     try {
         await apiCall(`/category-groups/${groupId}`, { method: 'DELETE' });
@@ -499,13 +495,29 @@ async function deleteGroup(groupId) {
         showToast('Group deleted successfully!');
     } catch (error) {
         console.error('Failed to delete group:', error);
+        showToast('Cannot delete group: it still contains categories. Please move or delete all categories first.', 'error');
     }
 }
 
+function toggleGroupCollapse(groupId) {
+    if (collapsedGroups.has(groupId)) {
+        collapsedGroups.delete(groupId);
+    } else {
+        collapsedGroups.add(groupId);
+    }
+    loadBudgetView();
+}
+
+// Make toggleGroupCollapse available globally for onclick handler
+window.toggleGroupCollapse = toggleGroupCollapse;
+
 // Inline category management functions
 function showAddCategoryInline(groupId, event) {
-    // Normalize groupId - convert "null" string or null to empty string
-    const normalizedGroupId = (groupId && groupId !== 'null') ? groupId : '';
+    // Validate groupId is required
+    if (!groupId || groupId === 'null') {
+        showToast('Cannot add category: group is required', 'error');
+        return;
+    }
 
     const colors = [
         { hex: '#f97316', name: 'Orange' },
@@ -528,9 +540,7 @@ function showAddCategoryInline(groupId, event) {
                  title="${color.name}"></button>`
     ).join('');
 
-    const groupSelector = normalizedGroupId
-        ? `<input type="hidden" id="inline-category-group" value="${normalizedGroupId}">`
-        : `<input type="hidden" id="inline-category-group" value="">`;
+    const groupSelector = `<input type="hidden" id="inline-category-group" value="${groupId}">`;
 
     const formHtml = `
         <div id="inline-category-form" class="bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-lg p-4 mt-2">
@@ -566,9 +576,7 @@ function showAddCategoryInline(groupId, event) {
         targetButton.insertAdjacentHTML('beforebegin', formHtml);
     } else {
         // Fallback: append to the appropriate group container
-        const targetContainer = normalizedGroupId
-            ? document.querySelector(`.group-categories[data-group-id="${normalizedGroupId}"]`)
-            : document.querySelector('.group-categories[data-group-id="ungrouped"]');
+        const targetContainer = document.querySelector(`.group-categories[data-group-id="${groupId}"]`);
         if (targetContainer) {
             targetContainer.insertAdjacentHTML('afterend', formHtml);
         }
@@ -613,6 +621,12 @@ async function saveInlineCategory() {
         return;
     }
 
+    // Validate groupId is required
+    if (!groupId || groupId === '' || groupId === 'null') {
+        showToast('Group is required for all categories', 'error');
+        return;
+    }
+
     try {
         const categoryData = {
             name,
@@ -625,9 +639,8 @@ async function saveInlineCategory() {
             body: JSON.stringify(categoryData)
         });
 
-        // If group is specified, assign category to group
-        // Check for valid group ID (not empty string and not the string "null")
-        if (groupId && groupId !== '' && groupId !== 'null' && newCategory.id) {
+        // Assign category to group
+        if (newCategory.id) {
             await apiCall('/category-groups/assign', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1054,6 +1067,215 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
         setTimeout(() => saveAllocation(), 100);
     });
 }
+
+// Inline category name editing
+async function startCategoryNameEdit(categoryId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Category name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/categories/${categoryId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        color: '', // Will be preserved by backend
+                        description: ''
+                    })
+                });
+
+                showToast('Category name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update category name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+
+// Show color picker for category
+function showColorPicker(categoryId, currentColor) {
+    const colors = [
+        { hex: '#f97316', name: 'Orange' },
+        { hex: '#3b82f6', name: 'Blue' },
+        { hex: '#10b981', name: 'Green' },
+        { hex: '#a855f7', name: 'Purple' },
+        { hex: '#ef4444', name: 'Red' },
+        { hex: '#ec4899', name: 'Pink' },
+        { hex: '#eab308', name: 'Yellow' },
+        { hex: '#6366f1', name: 'Indigo' },
+        { hex: '#14b8a6', name: 'Teal' },
+        { hex: '#6b7280', name: 'Gray' }
+    ];
+
+    const colorButtons = colors.map(color =>
+        `<button onclick="updateCategoryColor('${categoryId}', '${color.hex}');"
+                 class="w-8 h-8 rounded-full hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition ${color.hex === currentColor ? 'ring-2 ring-blue-600' : ''}"
+                 style="background-color: ${color.hex}"
+                 title="${color.name}"></button>`
+    ).join('');
+
+    const picker = document.createElement('div');
+    picker.id = 'color-picker-popup';
+    picker.className = 'fixed bg-white border-2 border-gray-300 rounded-lg shadow-xl p-4 z-50';
+    picker.style.left = event.pageX + 'px';
+    picker.style.top = event.pageY + 'px';
+    picker.innerHTML = `
+        <div class="mb-2 text-sm font-semibold text-gray-700">Select Color</div>
+        <div class="grid grid-cols-5 gap-2 mb-2">
+            ${colorButtons}
+        </div>
+        <button onclick="closeColorPicker()" class="text-xs text-gray-600 hover:text-gray-800 w-full">Cancel</button>
+    `;
+
+    // Remove any existing picker
+    const existing = document.getElementById('color-picker-popup');
+    if (existing) existing.remove();
+
+    document.body.appendChild(picker);
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeOnClickOutside(e) {
+            if (!picker.contains(e.target)) {
+                closeColorPicker();
+                document.removeEventListener('click', closeOnClickOutside);
+            }
+        });
+    }, 100);
+}
+
+function closeColorPicker() {
+    const picker = document.getElementById('color-picker-popup');
+    if (picker) picker.remove();
+}
+
+async function updateCategoryColor(categoryId, newColor) {
+    closeColorPicker();
+
+    try {
+        await apiCall(`/categories/${categoryId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: '', // Will be preserved by backend
+                color: newColor,
+                description: ''
+            })
+        });
+
+        showToast('Color updated!');
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to update category color:', error);
+    }
+}
+async function startGroupNameEdit(groupId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-lg font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Group name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/category-groups/${groupId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        description: '',
+                        display_order: 0 // Will be preserved by backend
+                    })
+                });
+
+                showToast('Group name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update group name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+// Make function globally available
+window.startGroupNameEdit = startGroupNameEdit;
 
 // Load uncategorized transactions
 async function loadUncategorizedTransactions() {

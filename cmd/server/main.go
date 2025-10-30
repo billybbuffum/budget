@@ -42,6 +42,14 @@ func main() {
 	allocationRepo := repository.NewAllocationRepository(db)
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
 
+	// Initialize default data
+	bootstrapService := application.NewBootstrapService(categoryGroupRepo, categoryRepo)
+	ctx := context.Background()
+	if err := bootstrapService.InitializeDefaultData(ctx); err != nil {
+		log.Fatalf("Failed to initialize default data: %v", err)
+	}
+	log.Println("Default data initialized successfully")
+
 	// Initialize OFX parser
 	ofxParser := ofx.NewParser()
 

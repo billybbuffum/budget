@@ -64,12 +64,12 @@ func initSchema(db *sql.DB) error {
 		name TEXT NOT NULL,
 		description TEXT,
 		color TEXT,
+		group_id TEXT NOT NULL,
 		payment_for_account_id TEXT,
-		group_id TEXT,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
-		FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-		FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE SET NULL
+		FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE RESTRICT,
+		FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS transactions (
@@ -107,6 +107,7 @@ func initSchema(db *sql.DB) error {
 		updated_at DATETIME NOT NULL
 	);
 
+	CREATE INDEX IF NOT EXISTS idx_categories_group_id ON categories(group_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
