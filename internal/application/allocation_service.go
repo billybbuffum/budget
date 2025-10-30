@@ -430,7 +430,22 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 	// This can be negative if you over-allocated!
 	// When you categorize unbudgeted spending, categories go negative (overspent).
 	// You must then allocate money to cover the overspending, reducing RTA.
-	return totalInflows - totalAllocations, nil
+	readyToAssign := totalInflows - totalAllocations
+
+	// Check for underfunded credit cards and subtract their shortfalls
+	// This ensures the indicator reflects CC debt that isn't properly covered
+	summaries, err := s.GetAllocationSummary(ctx, period)
+	if err == nil {
+		for _, summary := range summaries {
+			if summary.Underfunded != nil && *summary.Underfunded > 0 {
+				// Reduce ready to assign by the underfunded amount
+				// This makes underfunded CC spending equivalent to over-allocation
+				readyToAssign -= *summary.Underfunded
+			}
+		}
+	}
+
+	return readyToAssign, nil
 }
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
