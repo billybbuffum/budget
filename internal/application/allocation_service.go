@@ -439,7 +439,22 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 
 	// Ready to Assign = Total Account Balance - (Allocated - Spent)
 	// This can be negative if over-allocated!
-	return totalAccountBalance - (totalAllocations - totalSpent), nil
+	readyToAssign := totalAccountBalance - (totalAllocations - totalSpent)
+
+	// Check for underfunded credit cards and subtract their shortfalls
+	// This ensures the indicator reflects CC debt that isn't properly covered
+	summaries, err := s.GetAllocationSummary(ctx, period)
+	if err == nil {
+		for _, summary := range summaries {
+			if summary.Underfunded != nil && *summary.Underfunded > 0 {
+				// Reduce ready to assign by the underfunded amount
+				// This makes underfunded CC spending equivalent to over-allocation
+				readyToAssign -= *summary.Underfunded
+			}
+		}
+	}
+
+	return readyToAssign, nil
 }
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
