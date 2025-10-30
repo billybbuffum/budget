@@ -15,6 +15,7 @@ type AllocationService struct {
 	categoryRepo    domain.CategoryRepository
 	transactionRepo domain.TransactionRepository
 	budgetStateRepo domain.BudgetStateRepository
+	accountRepo     domain.AccountRepository
 }
 
 // NewAllocationService creates a new allocation service
@@ -23,12 +24,14 @@ func NewAllocationService(
 	categoryRepo domain.CategoryRepository,
 	transactionRepo domain.TransactionRepository,
 	budgetStateRepo domain.BudgetStateRepository,
+	accountRepo domain.AccountRepository,
 ) *AllocationService {
 	return &AllocationService{
 		allocationRepo:  allocationRepo,
 		categoryRepo:    categoryRepo,
 		transactionRepo: transactionRepo,
 		budgetStateRepo: budgetStateRepo,
+		accountRepo:     accountRepo,
 	}
 }
 
@@ -164,11 +167,30 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 		// Available = Total Allocated - Total Spent (includes rollover!)
 		available := totalAllocated - totalSpent
 
+		// For payment categories, check if underfunded (allocated < credit card balance)
+		var underfunded *int64
+		if category.PaymentForAccountID != nil && *category.PaymentForAccountID != "" {
+			// Get the credit card account balance
+			account, err := s.accountRepo.GetByID(ctx, *category.PaymentForAccountID)
+			if err == nil && account != nil {
+				// Credit card balance is negative (you owe money)
+				// We need enough allocated to cover the absolute value of the balance
+				amountOwed := -account.Balance // Convert to positive
+
+				if amountOwed > 0 && totalAllocated < amountOwed {
+					// Underfunded: need more money
+					shortfall := amountOwed - totalAllocated
+					underfunded = &shortfall
+				}
+			}
+		}
+
 		summary := &domain.AllocationSummary{
-			Allocation: allocation, // May be nil if no allocation for this period
-			Category:   category,
-			Activity:   activity,   // Activity for THIS period only
-			Available:  available,  // Includes rollover from previous periods
+			Allocation:  allocation,  // May be nil if no allocation for this period
+			Category:    category,
+			Activity:    activity,    // Activity for THIS period only
+			Available:   available,   // Includes rollover from previous periods
+			Underfunded: underfunded, // Amount needed to cover CC balance (nil if not underfunded)
 		}
 		summaries = append(summaries, summary)
 	}

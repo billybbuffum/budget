@@ -188,6 +188,7 @@ async function loadBudgetView() {
 
             // Payment categories are system-managed and cannot be manually edited
             const isPaymentCategory = category.payment_for_account_id !== null && category.payment_for_account_id !== undefined;
+            const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
             const allocatedDisplay = isPaymentCategory
                 ? `<div class="font-semibold" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
                 : `<div
@@ -198,8 +199,19 @@ async function loadBudgetView() {
                     ${formatCurrency(allocated)}
                 </div>`;
 
+            // Underfunded warning for payment categories
+            const underfundedWarning = isUnderfunded
+                ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="text-red-600 font-semibold">⚠️ Underfunded</span>
+                        <span class="text-red-700">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
+                    </div>
+                    <div class="text-xs text-red-600 mt-1">Allocate more to expense categories when using this card</div>
+                </div>`
+                : '';
+
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50' : ''}">
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50' : ''} ${isUnderfunded ? 'border-red-300' : ''}">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 flex-1">
                             <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
@@ -226,6 +238,7 @@ async function loadBudgetView() {
                             </div>
                         </div>
                     </div>
+                    ${underfundedWarning}
                 </div>
             `;
         }).join('');
