@@ -267,8 +267,8 @@ function renderBudgetCategory(category, summary) {
 
     const allocatedDisplay = isPaymentCategory
         ? `<div class="font-semibold" title="Auto-allocated">${formatCurrency(allocated)}</div>`
-        : `<div class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1"
-                onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
+        : `<div class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 no-drag"
+                onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                 title="Click to edit">${formatCurrency(allocated)}</div>`;
 
     const underfundedWarning = isUnderfunded
@@ -326,6 +326,8 @@ function initializeBudgetDragDrop() {
                 group: 'categories',
                 animation: 150,
                 ghostClass: 'opacity-50',
+                filter: '.no-drag',
+                preventOnFilter: false,
                 onEnd: async function(evt) {
                     const categoryId = evt.item.dataset.categoryId;
                     const newGroupId = evt.to.dataset.groupId;
