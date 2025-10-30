@@ -144,7 +144,10 @@
                 <div class="card">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">Categories</h2>
-                        <button onclick="showAddCategoryModal()" class="btn-primary">+ Add Category</button>
+                        <div class="flex gap-2">
+                            <button onclick="showAddCategoryGroupModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors">+ Add Group</button>
+                            <button onclick="showAddCategoryModal()" class="btn-primary">+ Add Category</button>
+                        </div>
                     </div>
 
                     <div class="mb-6">
@@ -249,9 +252,15 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Type *</label>
-                    <select id="category-type" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <select id="category-type" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="updateCategoryGroupOptions()">
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Group</label>
+                    <select id="category-group" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">No Group</option>
                     </select>
                 </div>
                 <div>
@@ -265,6 +274,39 @@
                 <div class="flex gap-2 justify-end pt-4">
                     <button type="button" onclick="closeModal('category-modal')" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Add Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Category Group Modal -->
+    <div id="category-group-modal" class="modal" onclick="if(event.target === this) closeModal('category-group-modal')">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">Add Category Group</h3>
+            <form id="category-group-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Group Name *</label>
+                    <input type="text" id="group-name" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="e.g., Housing, Transportation">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                    <select id="group-type" required class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
+                    <input type="number" id="group-display-order" value="0" min="0" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="0">
+                    <p class="text-xs text-gray-500 mt-1">Lower numbers appear first</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="group-description" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="2" placeholder="Optional"></textarea>
+                </div>
+                <div class="flex gap-2 justify-end pt-4">
+                    <button type="button" onclick="closeModal('category-group-modal')" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Group</button>
                 </div>
             </form>
         </div>

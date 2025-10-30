@@ -459,9 +459,26 @@ function showAddAccountModal() {
     showModal('account-modal');
 }
 
-function showAddCategoryModal() {
+async function showAddCategoryModal() {
+    await loadCategoryGroups();
     document.getElementById('category-form').reset();
+    updateCategoryGroupOptions();
     showModal('category-modal');
+}
+
+function showAddCategoryGroupModal() {
+    document.getElementById('category-group-form').reset();
+    showModal('category-group-modal');
+}
+
+function updateCategoryGroupOptions() {
+    const categoryType = document.getElementById('category-type').value;
+    const groupSelect = document.getElementById('category-group');
+
+    const filteredGroups = categoryGroups.filter(g => g.type === categoryType);
+
+    groupSelect.innerHTML = '<option value="">No Group</option>' +
+        filteredGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
 }
 
 function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
@@ -718,6 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const type = document.getElementById('category-type').value;
         const color = document.getElementById('category-color').value;
         const description = document.getElementById('category-description').value;
+        const groupId = document.getElementById('category-group').value;
 
         try {
             await apiCall('/categories', {
@@ -726,7 +744,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     name,
                     type,
                     color,
-                    description
+                    description,
+                    group_id: groupId || null
                 })
             });
 
@@ -740,6 +759,38 @@ document.addEventListener('DOMContentLoaded', function() {
             loadBudgetView();
         } catch (error) {
             console.error('Failed to create category:', error);
+        }
+    });
+
+    // Category group form
+    document.getElementById('category-group-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('group-name').value;
+        const type = document.getElementById('group-type').value;
+        const description = document.getElementById('group-description').value;
+        const displayOrder = parseInt(document.getElementById('group-display-order').value) || 0;
+
+        try {
+            await apiCall('/category-groups', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    type,
+                    description,
+                    display_order: displayOrder
+                })
+            });
+
+            closeModal('category-group-modal');
+            document.getElementById('category-group-form').reset();
+            showToast('Category group created successfully!');
+
+            // Reload category groups and categories view
+            await loadCategoryGroups();
+            loadCategoriesView();
+        } catch (error) {
+            console.error('Failed to create category group:', error);
         }
     });
 
