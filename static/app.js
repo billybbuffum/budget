@@ -255,17 +255,30 @@ function renderGroupSection(group, groupCategories, summary) {
 
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}">
-            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-600 transition group">
-                <span class="drag-handle text-gray-400 dark:text-gray-500">⋮⋮</span>
-                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1 cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-500 rounded px-2 py-1 -mx-2 -my-1"
-                    onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
-                    title="Click to edit group name">${group.name}</h3>
-                <button onclick="event.stopPropagation(); deleteGroup('${group.id}');" class="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 no-drag" title="Delete group">Delete</button>
+            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
+                <div class="flex items-center gap-3 flex-1">
+                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
+                        <span class="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded px-2 py-1 -mx-2 -my-1 inline-block no-drag"
+                              onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
+                              title="Click to edit group name">${group.name}</span>
+                    </h3>
+                </div>
+                <div class="flex gap-6 items-center">
+                    <!-- Invisible spacers to align with category columns -->
+                    <div class="w-24"></div>
+                    <div class="w-24"></div>
+                    <div class="w-24"></div>
+                    <button onclick="event.stopPropagation(); deleteGroup('${group.id}');"
+                            class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
+                            style="font-size: 12px;"
+                            title="Delete group">✕</button>
+                </div>
             </div>
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded px-3 py-2 border border-dashed border-blue-300 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -281,7 +294,7 @@ function renderUngroupedSection(ungroupedCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded px-3 py-2 border border-dashed border-blue-300 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -310,16 +323,15 @@ function renderBudgetCategory(category, summary) {
         </div>` : '';
 
     const deleteButton = isPaymentCategory
-        ? ''
+        ? '<div class="ml-3 w-5 h-5"></div>' // Spacer to maintain alignment
         : `<button onclick="event.stopPropagation(); deleteCategory('${category.id}', '${category.name.replace(/'/g, "\\'")}');"
-                   class="absolute top-1 left-1 w-4 h-4 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded no-drag"
-                   style="font-size: 10px; line-height: 1;"
+                   class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
+                   style="font-size: 12px;"
                    title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category group relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
+        <div class="budget-category group border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-white dark:bg-gray-800'} cursor-move"
              data-category-id="${category.id}">
-            ${deleteButton}
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
@@ -334,18 +346,19 @@ function renderBudgetCategory(category, summary) {
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
-                    <div class="text-right">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
-                    <div class="text-right">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
-                    <div class="text-right min-w-[100px]">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
                         <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                     </div>
+                    ${deleteButton}
                 </div>
             </div>
             ${underfundedWarning}
@@ -733,7 +746,7 @@ async function startCategoryNameEdit(categoryId, currentName) {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = currentName;
-    input.className = 'border border-blue-500 rounded px-2 py-1 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500';
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
 
     clickedElement.innerHTML = '';
     clickedElement.appendChild(input);
@@ -890,7 +903,7 @@ async function startGroupNameEdit(groupId, currentName) {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = currentName;
-    input.className = 'border border-blue-500 rounded px-2 py-1 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500';
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-lg font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
 
     clickedElement.innerHTML = '';
     clickedElement.appendChild(input);
