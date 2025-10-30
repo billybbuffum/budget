@@ -369,28 +369,22 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 }
 
 // CalculateReadyToAssignForPeriod calculates Ready to Assign for a specific period
-// Formula: (Total Income through period) - (Total Allocations through period)
-// This allows future allocations without locking up current month's money
+// Formula: Total Account Balance - (Total Allocations through period - Total Spent through period)
+// This represents: "How much money do I have that isn't allocated to a category?"
+// Note: This calculation ignores future periods to allow forward budgeting
 func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context, period string) (int64, error) {
-	// Get all transactions
-	allTransactions, err := s.transactionRepo.List(ctx)
+	// Get total account balance (all money available)
+	allAccounts, err := s.accountRepo.List(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list transactions: %w", err)
+		return 0, fmt.Errorf("failed to list accounts: %w", err)
 	}
 
-	// Calculate total income through this period (positive transactions <= period)
-	var totalIncome int64
-	for _, txn := range allTransactions {
-		// Extract period from transaction date (YYYY-MM)
-		txnPeriod := txn.Date.Format("2006-01")
-
-		// Only count income (positive amounts) through this period
-		if txn.Amount > 0 && txnPeriod <= period {
-			totalIncome += txn.Amount
-		}
+	var totalAccountBalance int64
+	for _, account := range allAccounts {
+		totalAccountBalance += account.Balance
 	}
 
-	// Get all allocations
+	// Get all allocations through this period
 	allAllocations, err := s.allocationRepo.List(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list allocations: %w", err)
@@ -404,9 +398,27 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 		}
 	}
 
-	// Ready to Assign = Income - Allocations
+	// Get all transactions through this period
+	allTransactions, err := s.transactionRepo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list transactions: %w", err)
+	}
+
+	// Calculate total spent through this period (negative transactions = spending)
+	var totalSpent int64
+	for _, txn := range allTransactions {
+		// Extract period from transaction date (YYYY-MM)
+		txnPeriod := txn.Date.Format("2006-01")
+
+		// Only count spending (negative amounts) through this period
+		if txn.Amount < 0 && txnPeriod <= period {
+			totalSpent += -txn.Amount // Convert to positive
+		}
+	}
+
+	// Ready to Assign = Total Account Balance - (Allocated - Spent)
 	// This can be negative if over-allocated!
-	return totalIncome - totalAllocations, nil
+	return totalAccountBalance - (totalAllocations - totalSpent), nil
 }
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
