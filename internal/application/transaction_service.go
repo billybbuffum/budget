@@ -188,12 +188,23 @@ func (s *TransactionService) CreateTransfer(ctx context.Context, fromAccountID, 
 		return nil, fmt.Errorf("destination account not found: %w", err)
 	}
 
+	// If transferring TO a credit card, categorize the outbound transaction with payment category
+	// This shows the payment as "spending" from the payment category budget
+	var outboundCategoryID *string
+	if toAccount.Type == domain.AccountTypeCredit {
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, toAccountID)
+		if err == nil && paymentCategory != nil {
+			outboundCategoryID = &paymentCategory.ID
+		}
+	}
+
 	// Create outbound transaction (negative) from source account
 	outboundTxn := &domain.Transaction{
 		ID:                  uuid.New().String(),
 		Type:                domain.TransactionTypeTransfer,
 		AccountID:           fromAccountID,
 		TransferToAccountID: &toAccountID,
+		CategoryID:          outboundCategoryID, // Categorize with payment category if paying credit card
 		Amount:              -amount, // Negative for outbound
 		Description:         description,
 		Date:                date,

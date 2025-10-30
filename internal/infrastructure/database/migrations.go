@@ -29,6 +29,12 @@ var migrations = []Migration{
 		Up:          migrateAddFitID,
 		Down:        rollbackAddFitID,
 	},
+	{
+		Version:     "003_add_credit_card_support",
+		Description: "Add type and transfer_to_account_id columns for credit card and transfer support",
+		Up:          migrateAddCreditCardSupport,
+		Down:        rollbackAddCreditCardSupport,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -391,6 +397,170 @@ func RunMigrations(db *sql.DB) error {
 		}
 
 		fmt.Printf("Migration %s completed successfully\n", migration.Version)
+	}
+
+	return nil
+}
+
+// migrateAddCreditCardSupport adds type and transfer_to_account_id columns
+func migrateAddCreditCardSupport(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Step 1: Add payment_for_account_id column to categories (if it doesn't exist)
+	// Check if column exists first
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='payment_for_account_id'").Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check if payment_for_account_id exists: %w", err)
+	}
+
+	if columnExists == 0 {
+		_, err = tx.Exec("ALTER TABLE categories ADD COLUMN payment_for_account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE")
+		if err != nil {
+			return fmt.Errorf("failed to add payment_for_account_id column: %w", err)
+		}
+	}
+
+	// Step 2: Create new transactions table with type and transfer support
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
+			account_id TEXT NOT NULL,
+			transfer_to_account_id TEXT,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Step 3: Copy existing transactions (all as 'normal' type)
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, 'normal', account_id, NULL, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Step 4: Drop old table and rename
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old table: %w", err)
+	}
+
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename table: %w", err)
+	}
+
+	// Step 5: Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackAddCreditCardSupport removes type and transfer_to_account_id columns
+func rollbackAddCreditCardSupport(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check if there are any transfer transactions
+	var count int
+	err = tx.QueryRow("SELECT COUNT(*) FROM transactions WHERE type = 'transfer'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for transfer transactions: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("cannot rollback: %d transfer transactions exist", count)
+	}
+
+	// Create new transactions table without type and transfer_to_account_id
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			account_id TEXT NOT NULL,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Copy all data
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, account_id, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old table: %w", err)
+	}
+
+	// Rename new table
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename table: %w", err)
+	}
+
+	// Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
