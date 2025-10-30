@@ -200,11 +200,30 @@ async function loadBudgetView() {
 
         // Update Ready to Assign display with appropriate color
         const readyToAssignEl = document.getElementById('ready-to-assign');
+        const readyToAssignBox = document.getElementById('ready-to-assign-box');
+        const readyToAssignCheckmark = document.getElementById('ready-to-assign-checkmark');
+        const readyToAssignMessage = document.getElementById('ready-to-assign-message');
+
         readyToAssignEl.textContent = formatCurrency(readyToAssign);
-        if (readyToAssign < 0) {
-            readyToAssignEl.className = 'text-3xl font-bold text-red-600';
+
+        if (readyToAssign === 0) {
+            // All money assigned - show green with checkmark
+            readyToAssignEl.className = 'text-3xl font-bold text-green-600 dark:text-green-400';
+            readyToAssignBox.className = 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl text-green-600 dark:text-green-400';
+            readyToAssignMessage.textContent = 'All money assigned - good to go!';
+        } else if (readyToAssign < 0) {
+            // Overspent - show red
+            readyToAssignEl.className = 'text-3xl font-bold text-red-600 dark:text-red-400';
+            readyToAssignBox.className = 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl hidden';
+            readyToAssignMessage.textContent = 'Over-allocated! Adjust your budget.';
         } else {
-            readyToAssignEl.className = 'text-3xl font-bold text-blue-600';
+            // Has money to assign - show blue
+            readyToAssignEl.className = 'text-3xl font-bold text-blue-600 dark:text-blue-400';
+            readyToAssignBox.className = 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 transition-colors';
+            readyToAssignCheckmark.className = 'text-3xl hidden';
+            readyToAssignMessage.textContent = 'Money available to allocate to categories';
         }
 
         const budgetCategories = document.getElementById('budget-categories');

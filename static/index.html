@@ -53,10 +53,13 @@
                         </div>
                     </div>
 
-                    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                    <div id="ready-to-assign-box" class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 transition-colors">
                         <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Ready to Assign</div>
-                        <div class="text-3xl font-bold text-blue-600 dark:text-blue-400" id="ready-to-assign">$0.00</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">Money available to allocate to categories</div>
+                        <div class="flex items-center gap-2">
+                            <div class="text-3xl font-bold text-blue-600 dark:text-blue-400" id="ready-to-assign">$0.00</div>
+                            <div id="ready-to-assign-checkmark" class="text-3xl hidden">✓</div>
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-2" id="ready-to-assign-message">Money available to allocate to categories</div>
                     </div>
 
                     <div class="mb-4 flex justify-between items-center">
