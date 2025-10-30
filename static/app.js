@@ -783,7 +783,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('transfer-form').reset();
             showToast('Transfer created successfully!');
 
-            // Reload views
+            // Reload views (including budget to show payment category updates)
+            loadBudgetView();
             loadAccountsView();
             loadTransactionsView();
         } catch (error) {
