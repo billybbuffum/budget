@@ -37,7 +37,8 @@ func NewSQLiteDB(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-// initSchema creates all necessary tables
+// initSchema creates all necessary tables with the final schema
+// This reflects the state after all migrations have been applied
 func initSchema(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS accounts (
@@ -80,6 +81,7 @@ func initSchema(db *sql.DB) error {
 		amount INTEGER NOT NULL,
 		description TEXT,
 		date DATETIME NOT NULL,
+		fitid TEXT,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
@@ -109,8 +111,11 @@ func initSchema(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+	CREATE INDEX IF NOT EXISTS idx_transactions_fitid ON transactions(fitid);
+	CREATE INDEX IF NOT EXISTS idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
 	CREATE INDEX IF NOT EXISTS idx_allocations_period ON allocations(period);
 	CREATE INDEX IF NOT EXISTS idx_allocations_category_id ON allocations(category_id);
+	CREATE INDEX IF NOT EXISTS idx_categories_group_id ON categories(group_id);
 
 	-- Insert default budget state if it doesn't exist
 	INSERT OR IGNORE INTO budget_state (id, ready_to_assign, updated_at)

@@ -11,17 +11,19 @@ import (
 
 // AccountService handles account-related business logic
 type AccountService struct {
-	accountRepo     domain.AccountRepository
-	categoryRepo    domain.CategoryRepository
-	budgetStateRepo domain.BudgetStateRepository
+	accountRepo          domain.AccountRepository
+	categoryRepo         domain.CategoryRepository
+	budgetStateRepo      domain.BudgetStateRepository
+	categoryGroupService *CategoryGroupService
 }
 
 // NewAccountService creates a new account service
-func NewAccountService(accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, budgetStateRepo domain.BudgetStateRepository) *AccountService {
+func NewAccountService(accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, budgetStateRepo domain.BudgetStateRepository, categoryGroupService *CategoryGroupService) *AccountService {
 	return &AccountService{
-		accountRepo:     accountRepo,
-		categoryRepo:    categoryRepo,
-		budgetStateRepo: budgetStateRepo,
+		accountRepo:          accountRepo,
+		categoryRepo:         categoryRepo,
+		budgetStateRepo:      budgetStateRepo,
+		categoryGroupService: categoryGroupService,
 	}
 }
 
@@ -52,13 +54,22 @@ func (s *AccountService) CreateAccount(ctx context.Context, name string, balance
 		return nil, err
 	}
 
-	// For credit cards, create a payment category
+	// For credit cards, create a payment category and assign it to the CC payments group
 	if accountType == domain.AccountTypeCredit {
+		// Ensure the credit card payments group exists
+		group, err := s.categoryGroupService.EnsureCreditCardPaymentsGroup(ctx)
+		if err != nil {
+			// Rollback account creation if group creation fails
+			s.accountRepo.Delete(ctx, account.ID)
+			return nil, fmt.Errorf("failed to ensure credit card payments group: %w", err)
+		}
+
 		paymentCategory := &domain.Category{
 			ID:                  uuid.New().String(),
 			Name:                name + " Payment",
 			Description:         "Payment category for " + name,
 			Color:               "#FF6B6B", // Red-ish color for credit card payments
+			GroupID:             &group.ID,
 			PaymentForAccountID: &account.ID,
 			CreatedAt:           time.Now(),
 			UpdatedAt:           time.Now(),
@@ -150,11 +161,24 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id, name string, bal
 }
 
 // DeleteAccount deletes an account and adjusts Ready to Assign
+// For credit card accounts, also deletes the payment category and cleans up the group if empty
 func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
-	// Get the account first to know its balance
+	// Get the account first to know its balance and type
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
+	}
+
+	// For credit cards, delete the payment category first
+	if account.Type == domain.AccountTypeCredit {
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, id)
+		if err == nil && paymentCategory != nil {
+			// Delete the payment category
+			if err := s.categoryRepo.Delete(ctx, paymentCategory.ID); err != nil {
+				return fmt.Errorf("failed to delete payment category: %w", err)
+			}
+		}
+		// Note: We ignore the error if payment category doesn't exist (already deleted?)
 	}
 
 	// Delete the account
@@ -167,6 +191,15 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
 	if account.Balance != 0 {
 		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -account.Balance); err != nil {
 			return fmt.Errorf("failed to adjust ready to assign: %w", err)
+		}
+	}
+
+	// For credit cards, cleanup the group if it's now empty
+	if account.Type == domain.AccountTypeCredit {
+		if err := s.categoryGroupService.DeleteCreditCardPaymentsGroupIfEmpty(ctx); err != nil {
+			// Log error but don't fail the deletion
+			// The group being present but empty is not a critical error
+			return fmt.Errorf("warning: failed to cleanup credit card payments group: %w", err)
 		}
 	}
 
