@@ -306,6 +306,21 @@ function renderBudgetCategory(category, summary) {
     const isPaymentCategory = category.payment_for_account_id != null;
     const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
 
+    // For payment categories, get the credit card account balance
+    let cardBalanceDisplay = '';
+    if (isPaymentCategory) {
+        const creditCardAccount = accounts.find(acc => acc.id === category.payment_for_account_id);
+        if (creditCardAccount) {
+            const cardBalance = Math.abs(creditCardAccount.balance);
+            const balanceClass = creditCardAccount.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+            cardBalanceDisplay = `
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Card Balance</div>
+                    <div class="font-semibold ${balanceClass}">${formatCurrency(cardBalance)}</div>
+                </div>`;
+        }
+    }
+
     const allocatedDisplay = isPaymentCategory
         ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
         : `<div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
@@ -338,6 +353,7 @@ function renderBudgetCategory(category, summary) {
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
+                    ${cardBalanceDisplay}
                     <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
@@ -667,7 +683,17 @@ async function loadAccountsView() {
         }
 
         accountsList.innerHTML = accounts.map(account => {
+            const isCreditCard = account.type === 'credit';
             const balanceClass = account.balance >= 0 ? 'text-green-600' : 'text-red-600';
+
+            // For credit cards, show "Owe $X.XX" instead of negative amount
+            let balanceDisplay;
+            if (isCreditCard && account.balance < 0) {
+                balanceDisplay = `<span class="text-sm text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+            } else {
+                balanceDisplay = formatCurrency(account.balance);
+            }
+
             return `
                 <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
@@ -676,7 +702,7 @@ async function loadAccountsView() {
                             <div class="text-sm text-gray-500 dark:text-gray-400 capitalize">${account.type}</div>
                         </div>
                         <div class="text-right">
-                            <div class="text-xl font-bold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                            <div class="text-xl font-bold ${balanceClass}">${balanceDisplay}</div>
                         </div>
                     </div>
                 </div>
@@ -1425,14 +1451,24 @@ async function renderAccountsSidebar() {
     `;
 
     accounts.forEach(account => {
+        const isCreditCard = account.type === 'credit';
         const balanceClass = account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+
+        // For credit cards, show "Owe $X.XX" instead of negative amount
+        let balanceDisplay;
+        if (isCreditCard && account.balance < 0) {
+            balanceDisplay = `<span class="text-xs text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+        } else {
+            balanceDisplay = formatCurrency(account.balance);
+        }
+
         html += `
             <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="loadAccountTransactionsPanel('${account.id}')">
                 <div class="flex justify-between items-start">
                     <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">${account.name}</div>
                     <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${account.type}</span>
                 </div>
-                <div class="text-sm font-semibold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                <div class="text-sm font-semibold ${balanceClass}">${balanceDisplay}</div>
             </div>
         `;
     });
