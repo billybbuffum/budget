@@ -18,7 +18,7 @@ func NewTransactionHandler(transactionService *application.TransactionService) *
 
 type CreateTransactionRequest struct {
 	AccountID   string    `json:"account_id"`
-	CategoryID  *string   `json:"category_id,omitempty"` // Optional for income, required for expenses
+	CategoryID  *string   `json:"category_id,omitempty"` // Optional for inflows, required for outflows
 	Amount      int64     `json:"amount"`                // in cents (positive=inflow, negative=outflow)
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
