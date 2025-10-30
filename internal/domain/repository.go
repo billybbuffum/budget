@@ -24,6 +24,8 @@ type CategoryRepository interface {
 	ListByGroup(ctx context.Context, groupID string) ([]*Category, error)
 	Update(ctx context.Context, category *Category) error
 	Delete(ctx context.Context, id string) error
+	FindByNameIncludingArchived(ctx context.Context, name string) (*Category, error)
+	RestoreCategory(ctx context.Context, id string) error
 }
 
 // CategoryGroupRepository defines the interface for category group data operations

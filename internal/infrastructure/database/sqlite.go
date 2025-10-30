@@ -55,6 +55,7 @@ func initSchema(db *sql.DB) error {
 		description TEXT,
 		color TEXT,
 		payment_for_account_id TEXT,
+		archived_at DATETIME,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
@@ -73,7 +74,7 @@ func initSchema(db *sql.DB) error {
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 		FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-		FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+		FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS allocations (
@@ -99,6 +100,7 @@ func initSchema(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 	CREATE INDEX IF NOT EXISTS idx_allocations_period ON allocations(period);
 	CREATE INDEX IF NOT EXISTS idx_allocations_category_id ON allocations(category_id);
+	CREATE INDEX IF NOT EXISTS idx_categories_archived_at ON categories(archived_at);
 
 	-- Insert default budget state if it doesn't exist
 	INSERT OR IGNORE INTO budget_state (id, ready_to_assign, updated_at)

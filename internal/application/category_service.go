@@ -21,9 +21,26 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 
 // CreateCategory creates a new category
 // Note: Categories no longer have types - only groups have types
+// If a category with the same name was previously archived, returns an error suggesting restoration
 func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string, groupID *string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
+	}
+
+	// Check if a category with this name exists (including archived)
+	existing, err := s.categoryRepo.FindByNameIncludingArchived(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing category: %w", err)
+	}
+
+	// If archived category with same name exists, return error with archived category ID
+	if existing != nil && existing.ArchivedAt != nil {
+		return nil, fmt.Errorf("archived_category_exists:%s", existing.ID)
+	}
+
+	// If active category with same name exists, return error
+	if existing != nil && existing.ArchivedAt == nil {
+		return nil, fmt.Errorf("category with name '%s' already exists", name)
 	}
 
 	category := &domain.Category{
@@ -82,9 +99,18 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, descript
 	return category, nil
 }
 
-// DeleteCategory deletes a category
-// NOTE: Consider implementing soft delete in the future to preserve history
-// For now, foreign key constraints prevent deletion if transactions/allocations exist
+// DeleteCategory archives a category (soft delete)
+// Transaction history is preserved with category names intact
+// Allocations are deleted via CASCADE to free up budget
 func (s *CategoryService) DeleteCategory(ctx context.Context, id string) error {
 	return s.categoryRepo.Delete(ctx, id)
+}
+
+// RestoreCategory restores an archived category
+func (s *CategoryService) RestoreCategory(ctx context.Context, id string) (*domain.Category, error) {
+	if err := s.categoryRepo.RestoreCategory(ctx, id); err != nil {
+		return nil, err
+	}
+	// Fetch and return the restored category
+	return s.categoryRepo.GetByID(ctx, id)
 }

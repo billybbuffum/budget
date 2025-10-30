@@ -54,10 +54,10 @@ var migrations = []Migration{
 		Down:        rollbackSimplifyGroups,
 	},
 	{
-		Version:     "007_fix_category_cascade_delete",
-		Description: "Fix transactions foreign key: category deletion should SET NULL instead of CASCADE to preserve transaction history",
-		Up:          migrateFixCategoryCascadeDelete,
-		Down:        rollbackFixCategoryCascadeDelete,
+		Version:     "007_add_category_soft_delete",
+		Description: "Add archived_at field to categories table for soft delete functionality",
+		Up:          migrateAddCategorySoftDelete,
+		Down:        rollbackAddCategorySoftDelete,
 	},
 }
 
@@ -836,72 +836,35 @@ func rollbackSimplifyGroups(db *sql.DB) error {
 	return nil
 }
 
-// migrateFixCategoryCascadeDelete fixes the transactions foreign key constraint
-// Changes category_id foreign key from ON DELETE CASCADE to ON DELETE SET NULL
-// This ensures transactions are preserved when a category is deleted (category_id is nulled)
-// This also ensures allocated budget is properly restored to "ready to assign"
-func migrateFixCategoryCascadeDelete(db *sql.DB) error {
+// migrateAddCategorySoftDelete adds archived_at field to categories table
+// This enables soft delete: categories are "archived" instead of deleted
+// Transaction history is preserved with category names intact
+func migrateAddCategorySoftDelete(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Create new transactions table with ON DELETE SET NULL for category_id
-	_, err = tx.Exec(`
-		CREATE TABLE transactions_new (
-			id TEXT PRIMARY KEY,
-			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
-			account_id TEXT NOT NULL,
-			transfer_to_account_id TEXT,
-			category_id TEXT,
-			amount INTEGER NOT NULL,
-			description TEXT,
-			date DATETIME NOT NULL,
-			fitid TEXT,
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL,
-			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
-		)
-	`)
+	// Check if archived_at column already exists
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='archived_at'").Scan(&columnExists)
 	if err != nil {
-		return fmt.Errorf("failed to create new transactions table: %w", err)
+		return fmt.Errorf("failed to check for archived_at column: %w", err)
 	}
 
-	// Copy all data from old table to new table
-	_, err = tx.Exec(`
-		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
-		SELECT id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at
-		FROM transactions
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to copy data to new transactions table: %w", err)
-	}
+	// Add archived_at column if it doesn't exist
+	if columnExists == 0 {
+		_, err = tx.Exec("ALTER TABLE categories ADD COLUMN archived_at DATETIME")
+		if err != nil {
+			return fmt.Errorf("failed to add archived_at column: %w", err)
+		}
 
-	// Drop old table
-	_, err = tx.Exec("DROP TABLE transactions")
-	if err != nil {
-		return fmt.Errorf("failed to drop old transactions table: %w", err)
-	}
-
-	// Rename new table to original name
-	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
-	if err != nil {
-		return fmt.Errorf("failed to rename new transactions table: %w", err)
-	}
-
-	// Recreate indexes
-	_, err = tx.Exec(`
-		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
-		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
-		CREATE INDEX idx_transactions_date ON transactions(date);
-		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
-		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to recreate indexes: %w", err)
+		// Create index for archived_at to speed up queries filtering archived categories
+		_, err = tx.Exec("CREATE INDEX IF NOT EXISTS idx_categories_archived_at ON categories(archived_at)")
+		if err != nil {
+			return fmt.Errorf("failed to create index on archived_at: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -911,70 +874,63 @@ func migrateFixCategoryCascadeDelete(db *sql.DB) error {
 	return nil
 }
 
-// rollbackFixCategoryCascadeDelete reverts the foreign key constraint change
-// Changes category_id foreign key from ON DELETE SET NULL back to ON DELETE CASCADE
-func rollbackFixCategoryCascadeDelete(db *sql.DB) error {
+// rollbackAddCategorySoftDelete removes the archived_at field from categories
+func rollbackAddCategorySoftDelete(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Create new transactions table with ON DELETE CASCADE for category_id
-	_, err = tx.Exec(`
-		CREATE TABLE transactions_new (
-			id TEXT PRIMARY KEY,
-			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
-			account_id TEXT NOT NULL,
-			transfer_to_account_id TEXT,
-			category_id TEXT,
-			amount INTEGER NOT NULL,
-			description TEXT,
-			date DATETIME NOT NULL,
-			fitid TEXT,
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL,
-			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-		)
-	`)
+	// Check if archived_at column exists
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name='archived_at'").Scan(&columnExists)
 	if err != nil {
-		return fmt.Errorf("failed to create new transactions table: %w", err)
+		return fmt.Errorf("failed to check for archived_at column: %w", err)
 	}
 
-	// Copy all data from old table to new table
-	_, err = tx.Exec(`
-		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
-		SELECT id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at
-		FROM transactions
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to copy data to new transactions table: %w", err)
-	}
+	// If archived_at exists, we need to recreate the table without it
+	if columnExists > 0 {
+		// Create categories table without archived_at column
+		_, err = tx.Exec(`
+			CREATE TABLE categories_new (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				description TEXT,
+				color TEXT,
+				group_id TEXT,
+				payment_for_account_id TEXT,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL,
+				FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE SET NULL,
+				FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
+			)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create new categories table: %w", err)
+		}
 
-	// Drop old table
-	_, err = tx.Exec("DROP TABLE transactions")
-	if err != nil {
-		return fmt.Errorf("failed to drop old transactions table: %w", err)
-	}
+		// Copy all data from old table to new table (archived_at column is dropped)
+		_, err = tx.Exec(`
+			INSERT INTO categories_new (id, name, description, color, group_id, payment_for_account_id, created_at, updated_at)
+			SELECT id, name, description, color, group_id, payment_for_account_id, created_at, updated_at
+			FROM categories
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to copy data to new categories table: %w", err)
+		}
 
-	// Rename new table to original name
-	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
-	if err != nil {
-		return fmt.Errorf("failed to rename new transactions table: %w", err)
-	}
+		// Drop old table
+		_, err = tx.Exec("DROP TABLE categories")
+		if err != nil {
+			return fmt.Errorf("failed to drop old categories table: %w", err)
+		}
 
-	// Recreate indexes
-	_, err = tx.Exec(`
-		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
-		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
-		CREATE INDEX idx_transactions_date ON transactions(date);
-		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
-		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to recreate indexes: %w", err)
+		// Rename new table to original name
+		_, err = tx.Exec("ALTER TABLE categories_new RENAME TO categories")
+		if err != nil {
+			return fmt.Errorf("failed to rename new categories table: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

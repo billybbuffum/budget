@@ -1083,6 +1083,36 @@ async function saveInlineCategory() {
         loadBudgetView();
     } catch (error) {
         console.error('Failed to add category:', error);
+
+        // Check if error is about archived category
+        if (error.message && error.message.startsWith('archived_category_exists:')) {
+            const archivedCategoryId = error.message.split(':')[1];
+            if (confirm(`A category named "${name}" was previously deleted. Would you like to restore it instead?`)) {
+                try {
+                    await apiCall(`/categories/${archivedCategoryId}/restore`, {
+                        method: 'POST'
+                    });
+
+                    // If group is specified, assign restored category to group
+                    if (groupId) {
+                        await apiCall('/category-groups/assign', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                category_id: archivedCategoryId,
+                                group_id: groupId
+                            })
+                        });
+                    }
+
+                    showToast('Category restored!');
+                    cancelInlineCategory();
+                    loadBudgetView();
+                } catch (restoreError) {
+                    console.error('Failed to restore category:', restoreError);
+                    showToast('Failed to restore category', 'error');
+                }
+            }
+        }
     }
 }
 

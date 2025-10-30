@@ -112,3 +112,20 @@ func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *CategoryHandler) RestoreCategory(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "category id is required", http.StatusBadRequest)
+		return
+	}
+
+	category, err := h.categoryService.RestoreCategory(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(category)
+}

@@ -41,6 +41,7 @@ func NewRouter(
 	mux.HandleFunc("GET /api/categories/{id}", categoryHandler.GetCategory)
 	mux.HandleFunc("PUT /api/categories/{id}", categoryHandler.UpdateCategory)
 	mux.HandleFunc("DELETE /api/categories/{id}", categoryHandler.DeleteCategory)
+	mux.HandleFunc("POST /api/categories/{id}/restore", categoryHandler.RestoreCategory)
 
 	// Category Group routes
 	mux.HandleFunc("POST /api/category-groups", categoryGroupHandler.CreateCategoryGroup)
