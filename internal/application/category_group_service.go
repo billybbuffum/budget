@@ -183,12 +183,12 @@ func (s *CategoryGroupService) EnsureCreditCardPaymentsGroup(ctx context.Context
 		return existingGroup, nil
 	}
 
-	// Create the group at the bottom of the list (high display order)
+	// Create the group at the top of the list (low display order)
 	group := &domain.CategoryGroup{
 		ID:           uuid.New().String(),
 		Name:         domain.CreditCardPaymentsGroupName,
 		Description:  "Payment categories for credit card accounts",
-		DisplayOrder: 9999, // Place at bottom
+		DisplayOrder: 0, // Place at top
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}

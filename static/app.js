@@ -236,6 +236,11 @@ function renderBudgetWithGroups(summary) {
         html += renderGroupSection(group, groupCategories, summary);
     }
 
+    // Add "Add Group" button at the end
+    html += `
+        <button onclick="showAddGroupInline(event);" class="w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition mt-2">+ Add Group</button>
+    `;
+
     return html;
 }
 
@@ -469,26 +474,81 @@ async function updateCategoryGroup(categoryId, groupId) {
     }
 }
 
-async function showAddGroupInline() {
-    const name = prompt('Enter group name (e.g., Housing, Transportation):');
-    if (!name) return;
+function showAddGroupInline(event) {
+    const formHtml = `
+        <div id="inline-group-form" class="bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-lg p-4 mt-2">
+            <h4 class="font-semibold mb-3 text-gray-800 dark:text-gray-100">Add New Group</h4>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Group Name *</label>
+                    <input type="text" id="inline-group-name" class="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="e.g., Housing, Transportation" required>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="saveInlineGroup()" class="btn-primary text-sm">Add Group</button>
+                    <button type="button" onclick="cancelInlineGroup()" class="btn-secondary text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove any existing form
+    const existing = document.getElementById('inline-group-form');
+    if (existing) existing.remove();
+
+    // Find the right place to insert the form (at the end of budget-categories)
+    const budgetCategories = document.getElementById('budget-categories');
+    if (budgetCategories) {
+        budgetCategories.insertAdjacentHTML('beforeend', formHtml);
+    }
+
+    // Focus on name input
+    setTimeout(() => {
+        const nameInput = document.getElementById('inline-group-name');
+        if (nameInput) nameInput.focus();
+    }, 50);
+}
+
+async function saveInlineGroup() {
+    const name = document.getElementById('inline-group-name').value.trim();
+
+    if (!name) {
+        showToast('Please enter a group name', 'error');
+        return;
+    }
 
     try {
-        const maxOrder = Math.max(0, ...categoryGroups.map(g => g.display_order));
+        // Find the maximum display_order, excluding the CC Payment group (which should stay at 0)
+        const ccPaymentGroup = categoryGroups.find(g => g.name === 'Credit Card Payments');
+        const otherGroups = categoryGroups.filter(g => g.name !== 'Credit Card Payments');
+        const maxOrder = otherGroups.length > 0
+            ? Math.max(...otherGroups.map(g => g.display_order))
+            : 0;
+
+        // New groups get maxOrder + 1, but at least 1 (to stay below CC Payment group at 0)
+        const newOrder = Math.max(1, maxOrder + 1);
+
         await apiCall('/category-groups', {
             method: 'POST',
             body: JSON.stringify({
                 name,
                 description: '',
-                display_order: maxOrder + 1
+                display_order: newOrder
             })
         });
+
+        showToast('Group created!');
+        cancelInlineGroup();
         await loadCategoryGroups();
-        loadBudgetView();
-        showToast('Group created successfully!');
+        await loadBudgetView();
     } catch (error) {
         console.error('Failed to create group:', error);
+        showToast('Failed to create group', 'error');
     }
+}
+
+function cancelInlineGroup() {
+    const form = document.getElementById('inline-group-form');
+    if (form) form.remove();
 }
 
 async function deleteGroup(groupId) {
@@ -1360,8 +1420,11 @@ async function startGroupNameEdit(groupId, currentName) {
     });
 }
 
-// Make function globally available
+// Make functions globally available
 window.startGroupNameEdit = startGroupNameEdit;
+window.showAddGroupInline = showAddGroupInline;
+window.saveInlineGroup = saveInlineGroup;
+window.cancelInlineGroup = cancelInlineGroup;
 
 // Load uncategorized transactions
 async function loadUncategorizedTransactions() {
