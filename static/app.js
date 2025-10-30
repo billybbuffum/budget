@@ -175,9 +175,9 @@ async function loadBudgetView() {
         }
 
         const budgetCategories = document.getElementById('budget-categories');
-        const expenseCategories = categories.filter(c => c.type === 'expense');
 
-        if (expenseCategories.length === 0) {
+        // Show all categories including payment categories (so users can see CC payment allocations)
+        if (categories.length === 0) {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
                     <p class="text-gray-500 mb-4">No expense categories yet.</p>
@@ -187,7 +187,7 @@ async function loadBudgetView() {
             return;
         }
 
-        budgetCategories.innerHTML = expenseCategories.map(category => {
+        budgetCategories.innerHTML = categories.map(category => {
             const allocation = allocations.find(a => a.category_id === category.id);
             const summaryItem = summary.find(s => s.category?.id === category.id);
 
@@ -197,26 +197,56 @@ async function loadBudgetView() {
 
             const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
 
+            // Payment categories are system-managed and cannot be manually edited
+            const isPaymentCategory = category.payment_for_account_id !== null && category.payment_for_account_id !== undefined;
+            const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
+            const allocatedDisplay = isPaymentCategory
+                ? `<div class="font-semibold" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
+                : `<div
+                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
+                    title="Click to edit allocation"
+                >
+                    ${formatCurrency(allocated)}
+                </div>`;
+
+            // Underfunded warning for payment categories
+            const underfundedWarning = isUnderfunded
+                ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-red-600 font-semibold">⚠️ Underfunded</span>
+                        <span class="text-red-700">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
+                    </div>
+                    ${summaryItem.underfunded_categories && summaryItem.underfunded_categories.length > 0
+                        ? `<div class="text-xs text-red-600 mt-1">
+                            <div class="font-semibold">Underfunded categories:</div>
+                            <ul class="list-disc list-inside ml-2 mt-1">
+                                ${summaryItem.underfunded_categories.map(cat => `<li>${cat}</li>`).join('')}
+                            </ul>
+                            <div class="mt-1 italic">Allocate more to these categories to cover credit card spending</div>
+                        </div>`
+                        : `<div class="text-xs text-red-600 mt-1">Allocate more to expense categories when using this card</div>`
+                    }
+                </div>`
+                : '';
+
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50' : ''} ${isUnderfunded ? 'border-red-300' : ''}">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 flex-1">
                             <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                             <div class="flex-1">
-                                <div class="font-semibold text-gray-800">${category.name}</div>
+                                <div class="font-semibold text-gray-800">
+                                    ${category.name}
+                                    ${isPaymentCategory ? '<span class="ml-2 text-xs text-orange-600 font-normal">(Auto-managed)</span>' : ''}
+                                </div>
                                 ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
                             </div>
                         </div>
                         <div class="flex gap-6 items-center">
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Allocated</div>
-                                <div
-                                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
-                                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
-                                    title="Click to edit allocation"
-                                >
-                                    ${formatCurrency(allocated)}
-                                </div>
+                                ${allocatedDisplay}
                             </div>
                             <div class="text-right">
                                 <div class="text-xs text-gray-500">Spent</div>
@@ -228,6 +258,7 @@ async function loadBudgetView() {
                             </div>
                         </div>
                     </div>
+                    ${underfundedWarning}
                 </div>
             `;
         }).join('');
@@ -309,6 +340,15 @@ async function loadTransactionsView() {
             const amountClass = transaction.amount >= 0 ? 'text-green-600' : 'text-red-600';
             const sign = transaction.amount >= 0 ? '+' : '';
 
+            // Handle transfer transactions
+            let transactionInfo = '';
+            if (transaction.type === 'transfer') {
+                const toAccount = accounts.find(a => a.id === transaction.transfer_to_account_id);
+                transactionInfo = `${formatDate(transaction.date)} • Transfer: ${account?.name || 'Unknown'} → ${toAccount?.name || 'Unknown'}`;
+            } else {
+                transactionInfo = `${formatDate(transaction.date)} • ${account?.name || 'Unknown'}${category ? ' • ' + category.name : ''}`;
+            }
+
             return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
@@ -318,7 +358,7 @@ async function loadTransactionsView() {
                                 <div class="font-semibold text-gray-800">${transaction.description || 'Transaction'}</div>
                             </div>
                             <div class="text-sm text-gray-500 mt-1">
-                                ${formatDate(transaction.date)} • ${account?.name || 'Unknown'} • ${category?.name || 'Unknown'}
+                                ${transactionInfo}
                             </div>
                         </div>
                         <div class="text-right">
@@ -338,22 +378,14 @@ async function loadCategoriesView() {
     try {
         await loadCategories();
 
-        const expenseCategories = categories.filter(c => c.type === 'expense');
-        const incomeCategories = categories.filter(c => c.type === 'income');
+        // Filter out payment categories (auto-created for credit cards)
+        const userCategories = categories.filter(c => !c.payment_for_account_id);
+        const categoriesList = document.getElementById('categories-list');
 
-        const expenseCategoriesList = document.getElementById('expense-categories-list');
-        const incomeCategoriesList = document.getElementById('income-categories-list');
-
-        if (expenseCategories.length === 0) {
-            expenseCategoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No expense categories yet.</div>';
+        if (userCategories.length === 0) {
+            categoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
         } else {
-            expenseCategoriesList.innerHTML = expenseCategories.map(category => renderCategoryCard(category)).join('');
-        }
-
-        if (incomeCategories.length === 0) {
-            incomeCategoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No income categories yet.</div>';
-        } else {
-            incomeCategoriesList.innerHTML = incomeCategories.map(category => renderCategoryCard(category)).join('');
+            categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
         }
     } catch (error) {
         console.error('Failed to load categories view:', error);
@@ -412,14 +444,39 @@ async function showAddTransactionModal() {
     accountSelect.innerHTML = '<option value="">Select account...</option>' +
         accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
 
+    // Filter out payment categories (auto-created for credit cards)
+    const userCategories = categories.filter(c => !c.payment_for_account_id);
     categorySelect.innerHTML = '<option value="">Select category...</option>' +
-        categories.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+        userCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('transaction-date').value = today;
 
     showModal('transaction-modal');
+}
+
+async function showAddTransferModal() {
+    await loadAccounts();
+
+    if (accounts.length < 2) {
+        showToast('You need at least 2 accounts to make a transfer', 'error');
+        return;
+    }
+
+    // Populate account dropdowns
+    const fromAccountSelect = document.getElementById('transfer-from-account');
+    const toAccountSelect = document.getElementById('transfer-to-account');
+
+    const accountOptions = accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+    fromAccountSelect.innerHTML = '<option value="">Select account...</option>' + accountOptions;
+    toAccountSelect.innerHTML = '<option value="">Select account...</option>' + accountOptions;
+
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('transfer-date').value = today;
+
+    showModal('transfer-modal');
 }
 
 function showAddAccountModal() {
@@ -615,6 +672,22 @@ async function loadImportView() {
 
 // Form submissions
 document.addEventListener('DOMContentLoaded', function() {
+    // Add listener for transaction type change to update category requirement
+    document.getElementById('transaction-type').addEventListener('change', function() {
+        const categorySelect = document.getElementById('transaction-category');
+        const categoryIndicator = document.getElementById('category-required-indicator');
+
+        if (this.value === 'inflow') {
+            // Income: category is optional
+            categorySelect.removeAttribute('required');
+            categoryIndicator.textContent = '';
+        } else {
+            // Expense: category is required
+            categorySelect.setAttribute('required', 'required');
+            categoryIndicator.textContent = '*';
+        }
+    });
+
     // Color swatch selection
     document.querySelectorAll('.color-swatch').forEach(swatch => {
         swatch.addEventListener('click', function(e) {
@@ -643,8 +716,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const date = document.getElementById('transaction-date').value;
         const description = document.getElementById('transaction-description').value;
 
-        if (!accountId || !categoryId) {
-            showToast('Please select account and category', 'error');
+        if (!accountId) {
+            showToast('Please select an account', 'error');
+            return;
+        }
+
+        // Category is required for outflow but optional for inflow
+        if (type === 'outflow' && !categoryId) {
+            showToast('Please select a category for expenses', 'error');
             return;
         }
 
@@ -656,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: JSON.stringify({
                     account_id: accountId,
-                    category_id: categoryId,
+                    category_id: categoryId || null,
                     amount: amountInCents,
                     description: description || 'Transaction',
                     date: new Date(date).toISOString()
@@ -673,6 +752,54 @@ document.addEventListener('DOMContentLoaded', function() {
             loadTransactionsView();
         } catch (error) {
             console.error('Failed to create transaction:', error);
+        }
+    });
+
+    // Transfer form
+    document.getElementById('transfer-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const fromAccountId = document.getElementById('transfer-from-account').value;
+        const toAccountId = document.getElementById('transfer-to-account').value;
+        const amount = parseFloat(document.getElementById('transfer-amount').value);
+        const date = document.getElementById('transfer-date').value;
+        const description = document.getElementById('transfer-description').value;
+
+        if (!fromAccountId || !toAccountId) {
+            showToast('Please select both accounts', 'error');
+            return;
+        }
+
+        if (fromAccountId === toAccountId) {
+            showToast('Cannot transfer to the same account', 'error');
+            return;
+        }
+
+        // Convert amount to cents
+        const amountInCents = Math.round(amount * 100);
+
+        try {
+            await apiCall('/transactions/transfer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    from_account_id: fromAccountId,
+                    to_account_id: toAccountId,
+                    amount: amountInCents,
+                    description: description || 'Transfer',
+                    date: new Date(date).toISOString()
+                })
+            });
+
+            closeModal('transfer-modal');
+            document.getElementById('transfer-form').reset();
+            showToast('Transfer created successfully!');
+
+            // Reload views (including budget to show payment category updates)
+            loadBudgetView();
+            loadAccountsView();
+            loadTransactionsView();
+        } catch (error) {
+            console.error('Failed to create transfer:', error);
         }
     });
 
@@ -711,7 +838,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         const name = document.getElementById('category-name').value;
-        const type = document.getElementById('category-type').value;
         const color = document.getElementById('category-color').value;
         const description = document.getElementById('category-description').value;
 
@@ -720,7 +846,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: JSON.stringify({
                     name,
-                    type,
                     color,
                     description
                 })

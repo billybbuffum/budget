@@ -14,6 +14,7 @@ type TransactionService struct {
 	transactionRepo   domain.TransactionRepository
 	accountRepo       domain.AccountRepository
 	categoryRepo      domain.CategoryRepository
+	allocationRepo    domain.AllocationRepository
 	budgetStateRepo   domain.BudgetStateRepository
 }
 
@@ -22,19 +23,23 @@ func NewTransactionService(
 	transactionRepo domain.TransactionRepository,
 	accountRepo domain.AccountRepository,
 	categoryRepo domain.CategoryRepository,
+	allocationRepo domain.AllocationRepository,
 	budgetStateRepo domain.BudgetStateRepository,
 ) *TransactionService {
 	return &TransactionService{
 		transactionRepo: transactionRepo,
 		accountRepo:     accountRepo,
 		categoryRepo:    categoryRepo,
+		allocationRepo:  allocationRepo,
 		budgetStateRepo: budgetStateRepo,
 	}
 }
 
 // CreateTransaction creates a new transaction and updates account balance
-// Positive amount = inflow (adds to account), Negative amount = outflow (subtracts from account)
-// categoryID can be nil for imported transactions that haven't been categorized yet
+// Handles three types of transactions:
+// 1. Normal income (positive amount): Increases account and Ready to Assign
+// 2. Normal expense (negative amount): Decreases account, requires category
+// 3. Credit card expense: Decreases card balance, moves budget from expense category to payment category
 func (s *TransactionService) CreateTransaction(ctx context.Context, accountID string, categoryID *string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
 	// Validate account exists
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -42,19 +47,25 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
-	// Validate category exists if provided
-	if categoryID != nil {
+	if amount == 0 {
+		return nil, fmt.Errorf("amount must be non-zero")
+	}
+
+	// For expenses (negative amounts), category is required
+	if amount < 0 && (categoryID == nil || *categoryID == "") {
+		return nil, fmt.Errorf("category is required for expense transactions")
+	}
+
+	// Validate category if provided
+	if categoryID != nil && *categoryID != "" {
 		if _, err := s.categoryRepo.GetByID(ctx, *categoryID); err != nil {
 			return nil, fmt.Errorf("category not found: %w", err)
 		}
 	}
 
-	if amount == 0 {
-		return nil, fmt.Errorf("amount must be non-zero")
-	}
-
 	transaction := &domain.Transaction{
 		ID:          uuid.New().String(),
+		Type:        domain.TransactionTypeNormal,
 		AccountID:   accountID,
 		CategoryID:  categoryID,
 		Amount:      amount,
@@ -77,7 +88,242 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		return nil, fmt.Errorf("failed to update account balance: %w", err)
 	}
 
+	// CREDIT CARD SPENDING: Move budgeted money from expense category to payment category
+	// Only move money that's actually budgeted in the expense category
+	if account.Type == domain.AccountTypeCredit && categoryID != nil && amount < 0 {
+		// Get the payment category for this credit card
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
+		if err != nil {
+			// Rollback
+			s.accountRepo.Update(ctx, &domain.Account{
+				ID:        account.ID,
+				Balance:   account.Balance - amount,
+				UpdatedAt: time.Now(),
+			})
+			s.transactionRepo.Delete(ctx, transaction.ID)
+			return nil, fmt.Errorf("failed to get payment category: %w", err)
+		}
+
+		// Get current period (YYYY-MM format)
+		period := date.Format("2006-01")
+
+		// Get the expense category's allocation to see how much budget is available
+		expenseAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, *categoryID, period)
+
+		// Calculate how much money to move to payment category
+		// We only move money that's actually budgeted
+		amountToMove := int64(0)
+
+		if err == nil && expenseAlloc != nil && expenseAlloc.Amount > 0 {
+			// Get activity (spending) in the expense category for this period
+			// BEFORE the current transaction (we need to check what's available NOW)
+			startDate := date.AddDate(0, 0, -date.Day()+1) // First day of month
+			endDate := startDate.AddDate(0, 1, -1)          // Last day of month
+
+			transactions, err := s.transactionRepo.ListByCategory(ctx, *categoryID)
+			if err == nil {
+				var totalActivity int64 = 0
+				for _, txn := range transactions {
+					txnDate := txn.Date
+					// Only include transactions BEFORE the one we just created
+					// (exclude the current transaction ID)
+					if txn.ID != transaction.ID &&
+						(txnDate.After(startDate) || txnDate.Equal(startDate)) &&
+						(txnDate.Before(endDate) || txnDate.Equal(endDate)) {
+						totalActivity += txn.Amount
+					}
+				}
+
+				// Calculate available budget in expense category BEFORE this transaction
+				// Available = Allocated + Activity (activity is negative for expenses)
+				available := expenseAlloc.Amount + totalActivity
+
+				// Move the minimum of: spending amount or available budget
+				spendingAmount := -amount // Convert negative amount to positive
+				if available >= spendingAmount {
+					// Enough budget available, move full amount
+					amountToMove = spendingAmount
+				} else if available > 0 {
+					// Some budget available, move only what's available
+					amountToMove = available
+				}
+				// If available <= 0, amountToMove stays 0 (no budget to move)
+			}
+		}
+		// If expense category has no allocation, amountToMove stays 0
+
+		// Only update payment category allocation if there's money to move
+		if amountToMove > 0 {
+			// Get or create allocation for payment category
+			paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
+			if err != nil {
+				// Create new allocation
+				paymentAlloc = &domain.Allocation{
+					ID:         uuid.New().String(),
+					CategoryID: paymentCategory.ID,
+					Amount:     amountToMove,
+					Period:     period,
+					CreatedAt:  time.Now(),
+					UpdatedAt:  time.Now(),
+				}
+				if err := s.allocationRepo.Create(ctx, paymentAlloc); err != nil {
+					// Rollback
+					s.accountRepo.Update(ctx, &domain.Account{
+						ID:        account.ID,
+						Balance:   account.Balance - amount,
+						UpdatedAt: time.Now(),
+					})
+					s.transactionRepo.Delete(ctx, transaction.ID)
+					return nil, fmt.Errorf("failed to create payment allocation: %w", err)
+				}
+			} else {
+				// Update existing allocation
+				paymentAlloc.Amount += amountToMove
+				paymentAlloc.UpdatedAt = time.Now()
+				if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
+					// Rollback
+					s.accountRepo.Update(ctx, &domain.Account{
+						ID:        account.ID,
+						Balance:   account.Balance - amount,
+						UpdatedAt: time.Now(),
+					})
+					s.transactionRepo.Delete(ctx, transaction.ID)
+					return nil, fmt.Errorf("failed to update payment allocation: %w", err)
+				}
+			}
+		}
+	}
+
 	return transaction, nil
+}
+
+// CreateTransfer creates a transfer between two accounts
+// Transfers move money between accounts without affecting Ready to Assign
+// Amount should be positive (the amount to transfer)
+func (s *TransactionService) CreateTransfer(ctx context.Context, fromAccountID, toAccountID string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
+	if amount <= 0 {
+		return nil, fmt.Errorf("transfer amount must be positive")
+	}
+
+	if fromAccountID == toAccountID {
+		return nil, fmt.Errorf("cannot transfer to the same account")
+	}
+
+	// Validate both accounts exist
+	fromAccount, err := s.accountRepo.GetByID(ctx, fromAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("source account not found: %w", err)
+	}
+
+	toAccount, err := s.accountRepo.GetByID(ctx, toAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("destination account not found: %w", err)
+	}
+
+	// If transferring TO a credit card, check if we should categorize with payment category
+	// Only categorize if there's money allocated (don't categorize overpayments)
+	var outboundCategoryID *string
+	if toAccount.Type == domain.AccountTypeCredit {
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, toAccountID)
+		if err == nil && paymentCategory != nil {
+			// Check if payment category has any allocation
+			// Get all allocations for this payment category
+			allAllocations, err := s.allocationRepo.List(ctx)
+			if err == nil {
+				var totalAllocated int64
+				for _, alloc := range allAllocations {
+					if alloc.CategoryID == paymentCategory.ID {
+						totalAllocated += alloc.Amount
+					}
+				}
+
+				// Get all transactions already categorized with this payment category
+				allTransactions, err := s.transactionRepo.ListByCategory(ctx, paymentCategory.ID)
+				if err == nil {
+					var totalSpent int64
+					for _, txn := range allTransactions {
+						if txn.Amount < 0 {
+							totalSpent += -txn.Amount // Convert to positive
+						}
+					}
+
+					// Available = Allocated - Already Spent
+					available := totalAllocated - totalSpent
+
+					// Only categorize if payment <= available
+					// This prevents showing negative available when overpaying
+					if available >= amount {
+						outboundCategoryID = &paymentCategory.ID
+					}
+				}
+			}
+		}
+	}
+
+	// Create outbound transaction (negative) from source account
+	outboundTxn := &domain.Transaction{
+		ID:                  uuid.New().String(),
+		Type:                domain.TransactionTypeTransfer,
+		AccountID:           fromAccountID,
+		TransferToAccountID: &toAccountID,
+		CategoryID:          outboundCategoryID, // Categorize with payment category if allocated funds available
+		Amount:              -amount, // Negative for outbound
+		Description:         description,
+		Date:                date,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+
+	if err := s.transactionRepo.Create(ctx, outboundTxn); err != nil {
+		return nil, err
+	}
+
+	// Create inbound transaction (positive) on destination account
+	inboundTxn := &domain.Transaction{
+		ID:                  uuid.New().String(),
+		Type:                domain.TransactionTypeTransfer,
+		AccountID:           toAccountID,
+		TransferToAccountID: &fromAccountID, // Link back to source
+		Amount:              amount, // Positive for inbound
+		Description:         description,
+		Date:                date,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
+	}
+
+	if err := s.transactionRepo.Create(ctx, inboundTxn); err != nil {
+		// Rollback outbound transaction
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, err
+	}
+
+	// Update source account balance (decrease)
+	fromAccount.Balance -= amount
+	fromAccount.UpdatedAt = time.Now()
+	if err := s.accountRepo.Update(ctx, fromAccount); err != nil {
+		// Rollback both transactions
+		s.transactionRepo.Delete(ctx, inboundTxn.ID)
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, fmt.Errorf("failed to update source account balance: %w", err)
+	}
+
+	// Update destination account balance (increase)
+	toAccount.Balance += amount
+	toAccount.UpdatedAt = time.Now()
+	if err := s.accountRepo.Update(ctx, toAccount); err != nil {
+		// Rollback everything
+		fromAccount.Balance += amount // Restore source balance
+		s.accountRepo.Update(ctx, fromAccount)
+		s.transactionRepo.Delete(ctx, inboundTxn.ID)
+		s.transactionRepo.Delete(ctx, outboundTxn.ID)
+		return nil, fmt.Errorf("failed to update destination account balance: %w", err)
+	}
+
+	// Note: We DON'T adjust Ready to Assign because the money just moved between accounts
+	// Total money in the system is the same
+
+	// Return the outbound transaction (the one initiated by the user)
+	return outboundTxn, nil
 }
 
 // GetTransaction retrieves a transaction by ID
@@ -149,10 +395,9 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id, accountI
 		}
 	}
 
-	// Update category if provided (can be nil to clear category)
+	// Update category if provided
 	if categoryID != nil {
 		if *categoryID != "" {
-			// Validate category exists if not empty
 			if _, err := s.categoryRepo.GetByID(ctx, *categoryID); err != nil {
 				return nil, fmt.Errorf("category not found: %w", err)
 			}
@@ -161,6 +406,10 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id, accountI
 	}
 
 	if amount != 0 {
+		// Validate category requirement for expenses
+		if amount < 0 && (oldTransaction.CategoryID == nil || *oldTransaction.CategoryID == "") {
+			return nil, fmt.Errorf("category is required for expense transactions")
+		}
 		oldTransaction.Amount = amount
 	}
 
@@ -211,7 +460,7 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, id string) e
 	return nil
 }
 
-// ListUncategorizedTransactions retrieves all transactions without a category
+// ListUncategorizedTransactions returns all transactions that don't have a category assigned
 func (s *TransactionService) ListUncategorizedTransactions(ctx context.Context) ([]*domain.Transaction, error) {
 	return s.transactionRepo.ListUncategorized(ctx)
 }

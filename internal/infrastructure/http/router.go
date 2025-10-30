@@ -43,6 +43,7 @@ func NewRouter(
 
 	// Transaction routes
 	mux.HandleFunc("POST /api/transactions", transactionHandler.CreateTransaction)
+	mux.HandleFunc("POST /api/transactions/transfer", transactionHandler.CreateTransfer)
 	mux.HandleFunc("GET /api/transactions", transactionHandler.ListTransactions)
 	mux.HandleFunc("GET /api/transactions/{id}", transactionHandler.GetTransaction)
 	mux.HandleFunc("PUT /api/transactions/{id}", transactionHandler.UpdateTransaction)
