@@ -2,6 +2,7 @@
 let currentMonth = new Date();
 let accounts = [];
 let categories = [];
+let categoryGroups = [];
 let transactions = [];
 let allocations = [];
 
@@ -82,6 +83,11 @@ async function loadAccounts() {
 async function loadCategories() {
     categories = await apiCall('/categories') || [];
     return categories;
+}
+
+async function loadCategoryGroups() {
+    categoryGroups = await apiCall('/category-groups') || [];
+    return categoryGroups;
 }
 
 async function loadTransactions() {
@@ -376,7 +382,7 @@ async function loadTransactionsView() {
 // Categories view
 async function loadCategoriesView() {
     try {
-        await loadCategories();
+        await Promise.all([loadCategories(), loadCategoryGroups()]);
 
         // Filter out payment categories (auto-created for credit cards)
         const userCategories = categories.filter(c => !c.payment_for_account_id);
@@ -385,11 +391,48 @@ async function loadCategoriesView() {
         if (userCategories.length === 0) {
             categoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
         } else {
-            categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
+            // Sort groups by display order
+            const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
+            categoriesList.innerHTML = renderCategoriesByGroups(userCategories, sortedGroups);
         }
     } catch (error) {
         console.error('Failed to load categories view:', error);
     }
+}
+
+function renderCategoriesByGroups(categoriesList, groups) {
+    let html = '';
+
+    // Render groups with their categories
+    for (const group of groups) {
+        const groupCategories = categoriesList.filter(c => c.group_id === group.id);
+        if (groupCategories.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">${group.name}</h3>
+                    ${group.description ? `<p class="text-sm text-gray-500 mb-3">${group.description}</p>` : ''}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${groupCategories.map(category => renderCategoryCard(category)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Render ungrouped categories
+    const ungroupedCategories = categoriesList.filter(c => !c.group_id);
+    if (ungroupedCategories.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Ungrouped</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${ungroupedCategories.map(category => renderCategoryCard(category)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return html || '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
 }
 
 function renderCategoryCard(category) {
@@ -484,8 +527,15 @@ function showAddAccountModal() {
     showModal('account-modal');
 }
 
-function showAddCategoryModal() {
+async function showAddCategoryModal() {
+    await loadCategoryGroups();
     document.getElementById('category-form').reset();
+
+    // Populate group dropdown with all groups (no type filtering since categories don't have types)
+    const groupSelect = document.getElementById('category-group');
+    groupSelect.innerHTML = '<option value="">No Group</option>' +
+        categoryGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+
     // Reset color swatches to default (blue)
     document.querySelectorAll('.color-swatch').forEach(swatch => {
         swatch.classList.remove('selected');
@@ -840,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const name = document.getElementById('category-name').value;
         const color = document.getElementById('category-color').value;
         const description = document.getElementById('category-description').value;
+        const groupId = document.getElementById('category-group').value;
 
         try {
             await apiCall('/categories', {
@@ -847,7 +898,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     name,
                     color,
-                    description
+                    description,
+                    group_id: groupId || null
                 })
             });
 
