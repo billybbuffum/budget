@@ -1504,10 +1504,18 @@ async function quickCategorize(transactionId, categoryId) {
     if (!categoryId) return;
 
     try {
+        // Fetch the existing transaction to get all fields
+        const transaction = await apiCall(`/transactions/${transactionId}`);
+
+        // Update with all fields, only changing the category
         await apiCall(`/transactions/${transactionId}`, {
             method: 'PUT',
             body: JSON.stringify({
-                category_id: categoryId
+                account_id: transaction.account_id,
+                category_id: categoryId,
+                amount: transaction.amount,
+                description: transaction.description,
+                date: transaction.date
             })
         });
 
