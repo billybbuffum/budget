@@ -103,6 +103,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		}
 	} else if account.Type == domain.AccountTypeCredit && categoryID != nil {
 		// CREDIT CARD SPENDING: Move budgeted money from expense category to payment category
+		// Only move money that's actually budgeted in the expense category
+		// If overspending (spending more than allocated), only move what's available
+
 		// Get the payment category for this credit card
 		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
 		if err != nil {
@@ -119,41 +122,89 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		// Get current period (YYYY-MM format)
 		period := date.Format("2006-01")
 
-		// Get or create allocation for payment category
-		paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
-		if err != nil {
-			// Create new allocation
-			paymentAlloc = &domain.Allocation{
-				ID:         uuid.New().String(),
-				CategoryID: paymentCategory.ID,
-				Amount:     -amount, // Negative amount becomes positive allocation
-				Period:     period,
-				CreatedAt:  time.Now(),
-				UpdatedAt:  time.Now(),
+		// Get the expense category's allocation to see how much budget is available
+		expenseAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, *categoryID, period)
+
+		// Calculate how much money to move to payment category
+		// We only move money that's actually budgeted
+		amountToMove := int64(0)
+
+		if err == nil && expenseAlloc != nil && expenseAlloc.Amount > 0 {
+			// Get activity (spending) in the expense category for this period
+			// BEFORE the current transaction (we need to check what's available NOW)
+			startDate := date.AddDate(0, 0, -date.Day()+1) // First day of month
+			endDate := startDate.AddDate(0, 1, -1)          // Last day of month
+
+			transactions, err := s.transactionRepo.ListByCategory(ctx, *categoryID)
+			if err == nil {
+				var totalActivity int64 = 0
+				for _, txn := range transactions {
+					txnDate := txn.Date
+					// Only include transactions BEFORE the one we just created
+					// (exclude the current transaction ID)
+					if txn.ID != transaction.ID &&
+					   (txnDate.After(startDate) || txnDate.Equal(startDate)) &&
+					   (txnDate.Before(endDate) || txnDate.Equal(endDate)) {
+						totalActivity += txn.Amount
+					}
+				}
+
+				// Calculate available budget in expense category BEFORE this transaction
+				// Available = Allocated + Activity (activity is negative for expenses)
+				available := expenseAlloc.Amount + totalActivity
+
+				// Move the minimum of: spending amount or available budget
+				spendingAmount := -amount // Convert negative amount to positive
+				if available >= spendingAmount {
+					// Enough budget available, move full amount
+					amountToMove = spendingAmount
+				} else if available > 0 {
+					// Some budget available, move only what's available
+					amountToMove = available
+				}
+				// If available <= 0, amountToMove stays 0 (no budget to move)
 			}
-			if err := s.allocationRepo.Create(ctx, paymentAlloc); err != nil {
-				// Rollback
-				s.accountRepo.Update(ctx, &domain.Account{
-					ID:        account.ID,
-					Balance:   account.Balance - amount,
-					UpdatedAt: time.Now(),
-				})
-				s.transactionRepo.Delete(ctx, transaction.ID)
-				return nil, fmt.Errorf("failed to create payment allocation: %w", err)
-			}
-		} else {
-			// Update existing allocation
-			paymentAlloc.Amount += -amount // Add the spending amount
-			paymentAlloc.UpdatedAt = time.Now()
-			if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
-				// Rollback
-				s.accountRepo.Update(ctx, &domain.Account{
-					ID:        account.ID,
-					Balance:   account.Balance - amount,
-					UpdatedAt: time.Now(),
-				})
-				s.transactionRepo.Delete(ctx, transaction.ID)
-				return nil, fmt.Errorf("failed to update payment allocation: %w", err)
+		}
+		// If expense category has no allocation, amountToMove stays 0
+
+		// Only update payment category allocation if there's money to move
+		if amountToMove > 0 {
+			// Get or create allocation for payment category
+			paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
+			if err != nil {
+				// Create new allocation
+				paymentAlloc = &domain.Allocation{
+					ID:         uuid.New().String(),
+					CategoryID: paymentCategory.ID,
+					Amount:     amountToMove,
+					Period:     period,
+					CreatedAt:  time.Now(),
+					UpdatedAt:  time.Now(),
+				}
+				if err := s.allocationRepo.Create(ctx, paymentAlloc); err != nil {
+					// Rollback
+					s.accountRepo.Update(ctx, &domain.Account{
+						ID:        account.ID,
+						Balance:   account.Balance - amount,
+						UpdatedAt: time.Now(),
+					})
+					s.transactionRepo.Delete(ctx, transaction.ID)
+					return nil, fmt.Errorf("failed to create payment allocation: %w", err)
+				}
+			} else {
+				// Update existing allocation
+				paymentAlloc.Amount += amountToMove
+				paymentAlloc.UpdatedAt = time.Now()
+				if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
+					// Rollback
+					s.accountRepo.Update(ctx, &domain.Account{
+						ID:        account.ID,
+						Balance:   account.Balance - amount,
+						UpdatedAt: time.Now(),
+					})
+					s.transactionRepo.Delete(ctx, transaction.ID)
+					return nil, fmt.Errorf("failed to update payment allocation: %w", err)
+				}
 			}
 		}
 		// Note: We don't decrease Ready to Assign because the money was already allocated
