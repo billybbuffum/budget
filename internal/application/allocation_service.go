@@ -55,22 +55,12 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 	// Check if allocation already exists for this category+period
 	existing, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, categoryID, period)
 	if err == nil {
-		// Update existing allocation - adjust Ready to Assign by the difference
-		oldAmount := existing.Amount
-		delta := amount - oldAmount
-
+		// Update existing allocation
 		existing.Amount = amount
 		existing.Notes = notes
 		existing.UpdatedAt = time.Now()
 		if err := s.allocationRepo.Update(ctx, existing); err != nil {
 			return nil, err
-		}
-
-		// Adjust Ready to Assign by the difference (decrease if allocating more)
-		if delta != 0 {
-			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -delta); err != nil {
-				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
-			}
 		}
 
 		return existing, nil
@@ -89,14 +79,6 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 
 	if err := s.allocationRepo.Create(ctx, allocation); err != nil {
 		return nil, err
-	}
-
-	// Decrease Ready to Assign by the allocated amount
-	// Backend coordinates this automatically!
-	if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -amount); err != nil {
-		// Rollback if Ready to Assign update fails
-		s.allocationRepo.Delete(ctx, allocation.ID)
-		return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
 	}
 
 	return allocation, nil
@@ -180,8 +162,50 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 	return summaries, nil
 }
 
+// CalculateReadyToAssignForPeriod calculates Ready to Assign for a specific period
+// Formula: (Total Income through period) - (Total Allocations through period)
+// This allows future allocations without locking up current month's money
+func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context, period string) (int64, error) {
+	// Get all transactions
+	allTransactions, err := s.transactionRepo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list transactions: %w", err)
+	}
+
+	// Calculate total income through this period (positive transactions <= period)
+	var totalIncome int64
+	for _, txn := range allTransactions {
+		// Extract period from transaction date (YYYY-MM)
+		txnPeriod := txn.Date.Format("2006-01")
+
+		// Only count income (positive amounts) through this period
+		if txn.Amount > 0 && txnPeriod <= period {
+			totalIncome += txn.Amount
+		}
+	}
+
+	// Get all allocations
+	allAllocations, err := s.allocationRepo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list allocations: %w", err)
+	}
+
+	// Calculate total allocations through this period
+	var totalAllocations int64
+	for _, alloc := range allAllocations {
+		if alloc.Period <= period {
+			totalAllocations += alloc.Amount
+		}
+	}
+
+	// Ready to Assign = Income - Allocations
+	// This can be negative if over-allocated!
+	return totalIncome - totalAllocations, nil
+}
+
 // GetReadyToAssign reads the Ready to Assign amount from the database
-// The backend automatically coordinates this value when transactions and allocations change
+// DEPRECATED: This now returns 0 as Ready to Assign is calculated per-period
+// Use CalculateReadyToAssignForPeriod instead
 func (s *AllocationService) GetReadyToAssign(ctx context.Context) (int64, error) {
 	state, err := s.budgetStateRepo.Get(ctx)
 	if err != nil {
@@ -190,22 +214,11 @@ func (s *AllocationService) GetReadyToAssign(ctx context.Context) (int64, error)
 	return state.ReadyToAssign, nil
 }
 
-// DeleteAllocation deletes an allocation and returns money to Ready to Assign
+// DeleteAllocation deletes an allocation
 func (s *AllocationService) DeleteAllocation(ctx context.Context, id string) error {
-	// Get the allocation to know how much to add back to Ready to Assign
-	allocation, err := s.allocationRepo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-
 	// Delete the allocation
 	if err := s.allocationRepo.Delete(ctx, id); err != nil {
 		return err
-	}
-
-	// Return the allocated amount to Ready to Assign
-	if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, allocation.Amount); err != nil {
-		return fmt.Errorf("failed to adjust ready to assign: %w", err)
 	}
 
 	return nil
