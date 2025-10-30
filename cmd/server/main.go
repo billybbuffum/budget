@@ -46,9 +46,9 @@ func main() {
 	ofxParser := ofx.NewParser()
 
 	// Initialize services
-	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
 	categoryGroupService := application.NewCategoryGroupService(categoryGroupRepo, categoryRepo)
+	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo, categoryGroupService)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, allocationRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo, accountRepo)
 	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser)
