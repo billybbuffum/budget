@@ -1452,16 +1452,19 @@ async function renderUncategorizedTransactions() {
     try {
         const uncategorized = await apiCall('/transactions?uncategorized=true');
 
-        if (!uncategorized || uncategorized.length === 0) {
+        // Filter to only show outflows (negative amounts) - inflows don't need categorization
+        const outflows = uncategorized.filter(txn => txn.amount < 0);
+
+        if (!outflows || outflows.length === 0) {
             container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">All caught up!</p>';
             countSpan.textContent = '';
             return;
         }
 
-        countSpan.textContent = `(${uncategorized.length})`;
+        countSpan.textContent = `(${outflows.length})`;
 
         // Show first 5
-        const toShow = uncategorized.slice(0, 5);
+        const toShow = outflows.slice(0, 5);
         let html = '';
 
         for (const txn of toShow) {
@@ -1485,8 +1488,8 @@ async function renderUncategorizedTransactions() {
             `;
         }
 
-        if (uncategorized.length > 5) {
-            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${uncategorized.length - 5} more</p>`;
+        if (outflows.length > 5) {
+            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${outflows.length - 5} more</p>`;
         }
 
         container.innerHTML = html;
