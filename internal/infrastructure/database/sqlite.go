@@ -73,7 +73,7 @@ func initSchema(db *sql.DB) error {
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
 		FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-		FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS allocations (

@@ -53,6 +53,12 @@ var migrations = []Migration{
 		Up:          migrateSimplifyGroups,
 		Down:        rollbackSimplifyGroups,
 	},
+	{
+		Version:     "007_fix_category_cascade_delete",
+		Description: "Fix transactions foreign key: category deletion should SET NULL instead of CASCADE to preserve transaction history",
+		Up:          migrateFixCategoryCascadeDelete,
+		Down:        rollbackFixCategoryCascadeDelete,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -821,6 +827,154 @@ func rollbackSimplifyGroups(db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("failed to add type column: %w", err)
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// migrateFixCategoryCascadeDelete fixes the transactions foreign key constraint
+// Changes category_id foreign key from ON DELETE CASCADE to ON DELETE SET NULL
+// This ensures transactions are preserved when a category is deleted (category_id is nulled)
+// This also ensures allocated budget is properly restored to "ready to assign"
+func migrateFixCategoryCascadeDelete(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create new transactions table with ON DELETE SET NULL for category_id
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
+			account_id TEXT NOT NULL,
+			transfer_to_account_id TEXT,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Copy all data from old table to new table
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data to new transactions table: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old transactions table: %w", err)
+	}
+
+	// Rename new table to original name
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename new transactions table: %w", err)
+	}
+
+	// Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackFixCategoryCascadeDelete reverts the foreign key constraint change
+// Changes category_id foreign key from ON DELETE SET NULL back to ON DELETE CASCADE
+func rollbackFixCategoryCascadeDelete(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create new transactions table with ON DELETE CASCADE for category_id
+	_, err = tx.Exec(`
+		CREATE TABLE transactions_new (
+			id TEXT PRIMARY KEY,
+			type TEXT NOT NULL DEFAULT 'normal' CHECK(type IN ('normal', 'transfer')),
+			account_id TEXT NOT NULL,
+			transfer_to_account_id TEXT,
+			category_id TEXT,
+			amount INTEGER NOT NULL,
+			description TEXT,
+			date DATETIME NOT NULL,
+			fitid TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+			FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new transactions table: %w", err)
+	}
+
+	// Copy all data from old table to new table
+	_, err = tx.Exec(`
+		INSERT INTO transactions_new (id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at)
+		SELECT id, type, account_id, transfer_to_account_id, category_id, amount, description, date, fitid, created_at, updated_at
+		FROM transactions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy data to new transactions table: %w", err)
+	}
+
+	// Drop old table
+	_, err = tx.Exec("DROP TABLE transactions")
+	if err != nil {
+		return fmt.Errorf("failed to drop old transactions table: %w", err)
+	}
+
+	// Rename new table to original name
+	_, err = tx.Exec("ALTER TABLE transactions_new RENAME TO transactions")
+	if err != nil {
+		return fmt.Errorf("failed to rename new transactions table: %w", err)
+	}
+
+	// Recreate indexes
+	_, err = tx.Exec(`
+		CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+		CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+		CREATE INDEX idx_transactions_date ON transactions(date);
+		CREATE INDEX idx_transactions_fitid ON transactions(fitid);
+		CREATE INDEX idx_transactions_transfer_to_account_id ON transactions(transfer_to_account_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
