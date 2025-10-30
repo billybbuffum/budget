@@ -262,7 +262,7 @@ function renderBudgetCategory(category, summary) {
     const available = summaryItem?.available || (allocated - spent);
     const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
 
-    const isPaymentCategory = category.payment_for_account_id !== null;
+    const isPaymentCategory = category.payment_for_account_id != null;
     const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
 
     const allocatedDisplay = isPaymentCategory
