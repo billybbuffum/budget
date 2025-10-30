@@ -202,11 +202,20 @@ async function loadBudgetView() {
             // Underfunded warning for payment categories
             const underfundedWarning = isUnderfunded
                 ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 mb-1">
                         <span class="text-red-600 font-semibold">⚠️ Underfunded</span>
                         <span class="text-red-700">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
                     </div>
-                    <div class="text-xs text-red-600 mt-1">Allocate more to expense categories when using this card</div>
+                    ${summaryItem.underfunded_categories && summaryItem.underfunded_categories.length > 0
+                        ? `<div class="text-xs text-red-600 mt-1">
+                            <div class="font-semibold">Underfunded categories:</div>
+                            <ul class="list-disc list-inside ml-2 mt-1">
+                                ${summaryItem.underfunded_categories.map(cat => `<li>${cat}</li>`).join('')}
+                            </ul>
+                            <div class="mt-1 italic">Allocate more to these categories to cover credit card spending</div>
+                        </div>`
+                        : `<div class="text-xs text-red-600 mt-1">Allocate more to expense categories when using this card</div>`
+                    }
                 </div>`
                 : '';
 

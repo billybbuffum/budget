@@ -72,6 +72,12 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 			}
 		}
 
+		// RETROACTIVE PAYMENT CATEGORY ALLOCATION
+		// Sync payment categories when updating allocation
+		if err := s.syncPaymentCategoryAllocations(ctx, categoryID); err != nil {
+			fmt.Printf("Warning: failed to sync payment category allocations: %v\n", err)
+		}
+
 		return existing, nil
 	}
 
@@ -98,7 +104,142 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 		return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
 	}
 
+	// RETROACTIVE PAYMENT CATEGORY ALLOCATION
+	// When allocating to an expense category, check for CC spending and allocate to payment categories
+	if err := s.syncPaymentCategoryAllocations(ctx, categoryID); err != nil {
+		// Log error but don't fail the allocation
+		// The payment category allocation can be synced later
+		fmt.Printf("Warning: failed to sync payment category allocations: %v\n", err)
+	}
+
 	return allocation, nil
+}
+
+// syncPaymentCategoryAllocations checks for credit card spending on a category
+// and allocates to payment categories retroactively
+func (s *AllocationService) syncPaymentCategoryAllocations(ctx context.Context, categoryID string) error {
+	// Get all credit card accounts
+	allAccounts, err := s.accountRepo.List(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, account := range allAccounts {
+		if account.Type != domain.AccountTypeCredit {
+			continue
+		}
+
+		// Get payment category for this CC
+		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
+		if err != nil || paymentCategory == nil {
+			continue
+		}
+
+		// Get all transactions on this CC for the given expense category
+		ccTransactions, err := s.transactionRepo.ListByAccount(ctx, account.ID)
+		if err != nil {
+			continue
+		}
+
+		var totalCCSpending int64
+		for _, txn := range ccTransactions {
+			if txn.CategoryID != nil && *txn.CategoryID == categoryID && txn.Amount < 0 {
+				totalCCSpending += -txn.Amount // Convert to positive
+			}
+		}
+
+		if totalCCSpending == 0 {
+			continue
+		}
+
+		// Get the expense category's total allocation
+		allAllocations, err := s.allocationRepo.List(ctx)
+		if err != nil {
+			continue
+		}
+
+		var expenseCategoryAllocated int64
+		for _, alloc := range allAllocations {
+			if alloc.CategoryID == categoryID {
+				expenseCategoryAllocated += alloc.Amount
+			}
+		}
+
+		// Calculate how much to allocate to payment category
+		// Move the minimum of: CC spending or expense category allocation
+		amountToAllocate := totalCCSpending
+		if expenseCategoryAllocated < totalCCSpending {
+			amountToAllocate = expenseCategoryAllocated
+		}
+
+		if amountToAllocate == 0 {
+			continue
+		}
+
+		// Update payment category allocation by adding this category's contribution
+		// Find the allocation for the current period (or create one)
+		period := time.Now().Format("2006-01")
+		paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
+
+		if err != nil {
+			// Create new payment category allocation
+			newAlloc := &domain.Allocation{
+				ID:         uuid.New().String(),
+				CategoryID: paymentCategory.ID,
+				Amount:     amountToAllocate,
+				Period:     period,
+				Notes:      "Auto-allocated from retroactive CC spending",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			}
+
+			if err := s.allocationRepo.Create(ctx, newAlloc); err != nil {
+				return err
+			}
+		} else {
+			// Update existing allocation
+			// Calculate how much of the payment allocation comes from THIS expense category
+			// by checking previous allocations. We need to recalculate the entire payment allocation.
+
+			// Get ALL expense categories' CC spending and allocations
+			var totalShouldBeAllocated int64
+			ccTxns, _ := s.transactionRepo.ListByAccount(ctx, account.ID)
+			categoryContributions := make(map[string]int64)
+
+			for _, txn := range ccTxns {
+				if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 {
+					categoryContributions[*txn.CategoryID] += -txn.Amount
+				}
+			}
+
+			for catID, spending := range categoryContributions {
+				var catAlloc int64
+				for _, alloc := range allAllocations {
+					if alloc.CategoryID == catID {
+						catAlloc += alloc.Amount
+					}
+				}
+
+				contribution := spending
+				if catAlloc < spending {
+					contribution = catAlloc
+				}
+				totalShouldBeAllocated += contribution
+			}
+
+			// Update payment category to match total
+			if totalShouldBeAllocated != paymentAlloc.Amount {
+				paymentAlloc.Amount = totalShouldBeAllocated
+				paymentAlloc.UpdatedAt = time.Now()
+
+				if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // GetAllocation retrieves an allocation by ID
@@ -167,30 +308,77 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 		// Available = Total Allocated - Total Spent (includes rollover!)
 		available := totalAllocated - totalSpent
 
-		// For payment categories, check if underfunded (allocated < credit card balance)
+		// For payment categories, check if underfunded (available < credit card balance)
 		var underfunded *int64
+		var underfundedCategories []string
 		if category.PaymentForAccountID != nil && *category.PaymentForAccountID != "" {
 			// Get the credit card account balance
 			account, err := s.accountRepo.GetByID(ctx, *category.PaymentForAccountID)
 			if err == nil && account != nil {
 				// Credit card balance is negative (you owe money)
-				// We need enough allocated to cover the absolute value of the balance
+				// We need enough AVAILABLE (not just allocated) to cover the balance
 				amountOwed := -account.Balance // Convert to positive
 
-				if amountOwed > 0 && totalAllocated < amountOwed {
+				if amountOwed > 0 && available < amountOwed {
 					// Underfunded: need more money
-					shortfall := amountOwed - totalAllocated
+					shortfall := amountOwed - available
 					underfunded = &shortfall
+
+					// Find which expense categories are underfunded
+					// Get all transactions on this credit card
+					ccTransactions, err := s.transactionRepo.ListByAccount(ctx, *category.PaymentForAccountID)
+					if err == nil {
+						// Group by category and calculate spending per category
+						categorySpending := make(map[string]int64)
+						categoryNames := make(map[string]string)
+
+						for _, txn := range ccTransactions {
+							if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 {
+								// This is spending on an expense category
+								categorySpending[*txn.CategoryID] += -txn.Amount // Convert to positive
+
+								// Get category name
+								if _, exists := categoryNames[*txn.CategoryID]; !exists {
+									cat, err := s.categoryRepo.GetByID(ctx, *txn.CategoryID)
+									if err == nil {
+										categoryNames[*txn.CategoryID] = cat.Name
+									}
+								}
+							}
+						}
+
+						// Check each category to see if it has enough allocated
+						for catID, spending := range categorySpending {
+							// Get all allocations for this category
+							allAllocForCat, err := s.allocationRepo.List(ctx)
+							if err == nil {
+								var catTotalAllocated int64
+								for _, alloc := range allAllocForCat {
+									if alloc.CategoryID == catID {
+										catTotalAllocated += alloc.Amount
+									}
+								}
+
+								// If spending exceeds allocation, this category is underfunded
+								if spending > catTotalAllocated {
+									if name, exists := categoryNames[catID]; exists {
+										underfundedCategories = append(underfundedCategories, name)
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 
 		summary := &domain.AllocationSummary{
-			Allocation:  allocation,  // May be nil if no allocation for this period
-			Category:    category,
-			Activity:    activity,    // Activity for THIS period only
-			Available:   available,   // Includes rollover from previous periods
-			Underfunded: underfunded, // Amount needed to cover CC balance (nil if not underfunded)
+			Allocation:            allocation,             // May be nil if no allocation for this period
+			Category:              category,
+			Activity:              activity,               // Activity for THIS period only
+			Available:             available,              // Includes rollover from previous periods
+			Underfunded:           underfunded,            // Amount needed to cover CC balance (nil if not underfunded)
+			UnderfundedCategories: underfundedCategories,  // List of categories needing more allocation
 		}
 		summaries = append(summaries, summary)
 	}
