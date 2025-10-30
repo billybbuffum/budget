@@ -34,6 +34,9 @@ function updateThemeIcon(theme) {
     }
 }
 
+// Make toggleTheme available globally for onclick handler
+window.toggleTheme = toggleTheme;
+
 // Utility functions
 function formatCurrency(cents) {
     return new Intl.NumberFormat('en-US', {
