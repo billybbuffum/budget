@@ -555,7 +555,7 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     input.step = '0.01';
     input.min = '0';
     input.value = (currentAmount / 100).toFixed(2);
-    input.className = 'w-24 border border-blue-500 rounded px-2 py-1 text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500';
+    input.className = 'w-24 border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-center font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
 
     // Replace content with input
     clickedElement.innerHTML = '';
