@@ -223,7 +223,10 @@ function renderBudgetWithGroups(summary) {
     const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
 
     // Initialize collapsed state: collapse all groups by default on first load
-    if (collapsedGroups.size === 0) {
+    // Only initialize if we haven't set any state yet (use a flag to track first load)
+    if (typeof window.budgetGroupsInitialized === 'undefined') {
+        window.budgetGroupsInitialized = true;
+        collapsedGroups.clear();
         sortedGroups.forEach(group => collapsedGroups.add(group.id));
     }
 
