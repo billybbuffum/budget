@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/billybbuffum/budget/internal/application"
-	"github.com/billybbuffum/budget/internal/domain"
 )
 
 type CategoryGroupHandler struct {
@@ -18,14 +17,12 @@ func NewCategoryGroupHandler(categoryGroupService *application.CategoryGroupServ
 
 type CreateCategoryGroupRequest struct {
 	Name         string `json:"name"`
-	Type         string `json:"type"` // income or expense
 	Description  string `json:"description"`
 	DisplayOrder int    `json:"display_order"`
 }
 
 type UpdateCategoryGroupRequest struct {
 	Name         string `json:"name"`
-	Type         string `json:"type"`
 	Description  string `json:"description"`
 	DisplayOrder *int   `json:"display_order"`
 }
@@ -42,7 +39,7 @@ func (h *CategoryGroupHandler) CreateCategoryGroup(w http.ResponseWriter, r *htt
 		return
 	}
 
-	group, err := h.categoryGroupService.CreateCategoryGroup(r.Context(), req.Name, domain.CategoryType(req.Type), req.Description, req.DisplayOrder)
+	group, err := h.categoryGroupService.CreateCategoryGroup(r.Context(), req.Name, req.Description, req.DisplayOrder)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -71,17 +68,7 @@ func (h *CategoryGroupHandler) GetCategoryGroup(w http.ResponseWriter, r *http.R
 }
 
 func (h *CategoryGroupHandler) ListCategoryGroups(w http.ResponseWriter, r *http.Request) {
-	categoryType := r.URL.Query().Get("type")
-
-	var groups []*domain.CategoryGroup
-	var err error
-
-	if categoryType != "" {
-		groups, err = h.categoryGroupService.ListCategoryGroupsByType(r.Context(), domain.CategoryType(categoryType))
-	} else {
-		groups, err = h.categoryGroupService.ListCategoryGroups(r.Context())
-	}
-
+	groups, err := h.categoryGroupService.ListCategoryGroups(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -104,7 +91,7 @@ func (h *CategoryGroupHandler) UpdateCategoryGroup(w http.ResponseWriter, r *htt
 		return
 	}
 
-	group, err := h.categoryGroupService.UpdateCategoryGroup(r.Context(), id, req.Name, domain.CategoryType(req.Type), req.Description, req.DisplayOrder)
+	group, err := h.categoryGroupService.UpdateCategoryGroup(r.Context(), id, req.Name, req.Description, req.DisplayOrder)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

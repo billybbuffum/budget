@@ -47,6 +47,12 @@ var migrations = []Migration{
 		Up:          migrateAddCategoryGroups,
 		Down:        rollbackAddCategoryGroups,
 	},
+	{
+		Version:     "006_simplify_category_groups",
+		Description: "Remove type field from category_groups - groups are for budget organization only",
+		Up:          migrateSimplifyGroups,
+		Down:        rollbackSimplifyGroups,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -723,6 +729,98 @@ func rollbackAddCreditCardSupport(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// migrateSimplifyGroups removes the type field from category_groups table
+func migrateSimplifyGroups(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check if type column exists
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('category_groups') WHERE name='type'").Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check for type column: %w", err)
+	}
+
+	// If type column exists, recreate table without it
+	if columnExists > 0 {
+		// Create new table without type field
+		_, err = tx.Exec(`
+			CREATE TABLE category_groups_new (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				description TEXT,
+				display_order INTEGER NOT NULL DEFAULT 0,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL
+			)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create new category_groups table: %w", err)
+		}
+
+		// Copy data (type field is dropped)
+		_, err = tx.Exec(`
+			INSERT INTO category_groups_new (id, name, description, display_order, created_at, updated_at)
+			SELECT id, name, description, display_order, created_at, updated_at
+			FROM category_groups
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to copy data: %w", err)
+		}
+
+		// Drop old table
+		_, err = tx.Exec("DROP TABLE category_groups")
+		if err != nil {
+			return fmt.Errorf("failed to drop old table: %w", err)
+		}
+
+		// Rename new table
+		_, err = tx.Exec("ALTER TABLE category_groups_new RENAME TO category_groups")
+		if err != nil {
+			return fmt.Errorf("failed to rename table: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackSimplifyGroups adds back the type field to category_groups
+func rollbackSimplifyGroups(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Check if type column exists
+	var columnExists int
+	err = tx.QueryRow("SELECT COUNT(*) FROM pragma_table_info('category_groups') WHERE name='type'").Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check for type column: %w", err)
+	}
+
+	// If type doesn't exist, add it back
+	if columnExists == 0 {
+		_, err = tx.Exec("ALTER TABLE category_groups ADD COLUMN type TEXT NOT NULL DEFAULT 'expense' CHECK(type IN ('income', 'expense'))")
+		if err != nil {
+			return fmt.Errorf("failed to add type column: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

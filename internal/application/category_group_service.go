@@ -23,20 +23,15 @@ func NewCategoryGroupService(categoryGroupRepo domain.CategoryGroupRepository, c
 	}
 }
 
-// CreateCategoryGroup creates a new category group
-func (s *CategoryGroupService) CreateCategoryGroup(ctx context.Context, name string, categoryType domain.CategoryType, description string, displayOrder int) (*domain.CategoryGroup, error) {
+// CreateCategoryGroup creates a new category group for budget organization
+func (s *CategoryGroupService) CreateCategoryGroup(ctx context.Context, name, description string, displayOrder int) (*domain.CategoryGroup, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category group name is required")
-	}
-
-	if categoryType != domain.CategoryTypeIncome && categoryType != domain.CategoryTypeExpense {
-		return nil, fmt.Errorf("invalid category type: must be 'income' or 'expense'")
 	}
 
 	group := &domain.CategoryGroup{
 		ID:           uuid.New().String(),
 		Name:         name,
-		Type:         categoryType,
 		Description:  description,
 		DisplayOrder: displayOrder,
 		CreatedAt:    time.Now(),
@@ -60,13 +55,8 @@ func (s *CategoryGroupService) ListCategoryGroups(ctx context.Context) ([]*domai
 	return s.categoryGroupRepo.List(ctx)
 }
 
-// ListCategoryGroupsByType retrieves category groups by type
-func (s *CategoryGroupService) ListCategoryGroupsByType(ctx context.Context, categoryType domain.CategoryType) ([]*domain.CategoryGroup, error) {
-	return s.categoryGroupRepo.ListByType(ctx, categoryType)
-}
-
 // UpdateCategoryGroup updates an existing category group
-func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name string, categoryType domain.CategoryType, description string, displayOrder *int) (*domain.CategoryGroup, error) {
+func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name, description string, displayOrder *int) (*domain.CategoryGroup, error) {
 	group, err := s.categoryGroupRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -74,12 +64,6 @@ func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name
 
 	if name != "" {
 		group.Name = name
-	}
-	if categoryType != "" {
-		if categoryType != domain.CategoryTypeIncome && categoryType != domain.CategoryTypeExpense {
-			return nil, fmt.Errorf("invalid category type: must be 'income' or 'expense'")
-		}
-		group.Type = categoryType
 	}
 	if description != "" {
 		group.Description = description

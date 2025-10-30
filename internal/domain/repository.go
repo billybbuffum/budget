@@ -31,7 +31,6 @@ type CategoryGroupRepository interface {
 	Create(ctx context.Context, group *CategoryGroup) error
 	GetByID(ctx context.Context, id string) (*CategoryGroup, error)
 	List(ctx context.Context) ([]*CategoryGroup, error)
-	ListByType(ctx context.Context, categoryType CategoryType) ([]*CategoryGroup, error)
 	Update(ctx context.Context, group *CategoryGroup) error
 	Delete(ctx context.Context, id string) error
 }
