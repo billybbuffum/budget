@@ -109,7 +109,7 @@ async function loadReadyToAssign() {
 
 async function loadAllocationSummary() {
     const period = getCurrentPeriod();
-    return await apiCall(`/allocations/summary?period=${period}`) || [];
+    return await apiCall(`/allocations/summary?period=${period}`) || { ready_to_assign: 0, categories: [] };
 }
 
 async function loadAccountSummary() {
@@ -280,12 +280,14 @@ function renderBudgetCategory(category, summary) {
     const deleteButton = isPaymentCategory
         ? ''
         : `<button onclick="event.stopPropagation(); deleteCategory('${category.id}', '${category.name.replace(/'/g, "\\'")}');"
-                   class="delete-btn text-xs text-red-600 hover:text-red-800 opacity-0 group-hover:opacity-100 transition-opacity no-drag"
-                   title="Delete category">🗑️</button>`;
+                   class="absolute top-1 left-1 w-4 h-4 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded no-drag"
+                   style="font-size: 10px; line-height: 1;"
+                   title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category group border border-gray-200 rounded-lg p-4 bg-white cursor-move ${isPaymentCategory ? 'bg-orange-50' : ''}"
+        <div class="budget-category group relative border border-gray-200 rounded-lg p-4 bg-white cursor-move ${isPaymentCategory ? 'bg-orange-50' : ''}"
              data-category-id="${category.id}">
+            ${deleteButton}
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="text-gray-400 text-xs">⋮⋮</span>
@@ -298,7 +300,6 @@ function renderBudgetCategory(category, summary) {
                              onclick="event.stopPropagation(); startCategoryNameEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}')"
                              title="Click to edit name">${category.name}</div>
                     </div>
-                    ${deleteButton}
                 </div>
                 <div class="flex gap-6 items-center">
                     <div class="text-right">
@@ -1285,37 +1286,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadAccountsView();
         } catch (error) {
             console.error('Failed to create account:', error);
-        }
-    });
-
-    // Category form
-    document.getElementById('category-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const name = document.getElementById('category-name').value;
-        const color = document.getElementById('category-color').value;
-        const description = document.getElementById('category-description').value;
-
-        try {
-            await apiCall('/categories', {
-                method: 'POST',
-                body: JSON.stringify({
-                    name,
-                    color,
-                    description
-                })
-            });
-
-            closeModal('category-modal');
-            document.getElementById('category-form').reset();
-            showToast('Category created successfully!');
-
-            // Reload categories
-            await loadCategories();
-            loadCategoriesView();
-            loadBudgetView();
-        } catch (error) {
-            console.error('Failed to create category:', error);
         }
     });
 
