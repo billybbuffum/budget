@@ -196,7 +196,7 @@ async function loadBudgetView() {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
                     <p class="text-gray-500 dark:text-gray-400 mb-4">No expense categories yet.</p>
-                    <button onclick="showView('categories')" class="btn-primary">Create Your First Category</button>
+                    <button onclick="showAddCategoryModal()" class="btn-primary">Create Your First Category</button>
                 </div>
             `;
             return;
@@ -797,13 +797,13 @@ async function showAddTransactionModal() {
 
     if (accounts.length === 0) {
         showToast('Please create an account first', 'error');
-        showView('accounts');
+        showAddAccountModal();
         return;
     }
 
     if (categories.length === 0) {
         showToast('Please create a category first', 'error');
-        showView('categories');
+        showAddCategoryModal();
         return;
     }
 
@@ -1484,7 +1484,7 @@ async function renderRecentTransactions() {
 
     try {
         // Get all transactions and sort by date
-        const allTransactions = await apiCall('/transactions');
+        const allTransactions = await apiCall('/transactions') || [];
         const recent = allTransactions
             .filter(t => t.category_id) // Only categorized
             .sort((a, b) => new Date(b.date) - new Date(a.date))
