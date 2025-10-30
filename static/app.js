@@ -233,9 +233,9 @@ async function loadBudgetView() {
             const isPaymentCategory = category.payment_for_account_id !== null && category.payment_for_account_id !== undefined;
             const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
             const allocatedDisplay = isPaymentCategory
-                ? `<div class="font-semibold" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
+                ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
                 : `<div
-                    class="font-semibold cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                    class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
                     onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                     title="Click to edit allocation"
                 >
@@ -282,7 +282,7 @@ async function loadBudgetView() {
                             </div>
                             <div class="text-right">
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
-                                <div class="font-semibold">${formatCurrency(spent)}</div>
+                                <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                             </div>
                             <div class="text-right min-w-[100px]">
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
