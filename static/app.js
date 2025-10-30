@@ -429,6 +429,9 @@ async function deleteGroup(groupId) {
 
 // Inline category management functions
 function showAddCategoryInline(groupId, event) {
+    // Normalize groupId - convert "null" string or null to empty string
+    const normalizedGroupId = (groupId && groupId !== 'null') ? groupId : '';
+
     const colors = [
         { hex: '#f97316', name: 'Orange' },
         { hex: '#3b82f6', name: 'Blue' },
@@ -450,8 +453,8 @@ function showAddCategoryInline(groupId, event) {
                  title="${color.name}"></button>`
     ).join('');
 
-    const groupSelector = groupId
-        ? `<input type="hidden" id="inline-category-group" value="${groupId}">`
+    const groupSelector = normalizedGroupId
+        ? `<input type="hidden" id="inline-category-group" value="${normalizedGroupId}">`
         : `<input type="hidden" id="inline-category-group" value="">`;
 
     const formHtml = `
@@ -488,8 +491,8 @@ function showAddCategoryInline(groupId, event) {
         targetButton.insertAdjacentHTML('beforebegin', formHtml);
     } else {
         // Fallback: append to the appropriate group container
-        const targetContainer = groupId
-            ? document.querySelector(`.group-categories[data-group-id="${groupId}"]`)
+        const targetContainer = normalizedGroupId
+            ? document.querySelector(`.group-categories[data-group-id="${normalizedGroupId}"]`)
             : document.querySelector('.group-categories[data-group-id="ungrouped"]');
         if (targetContainer) {
             targetContainer.insertAdjacentHTML('afterend', formHtml);
@@ -548,7 +551,8 @@ async function saveInlineCategory() {
         });
 
         // If group is specified, assign category to group
-        if (groupId && newCategory.id) {
+        // Check for valid group ID (not empty string and not the string "null")
+        if (groupId && groupId !== '' && groupId !== 'null' && newCategory.id) {
             await apiCall('/category-groups/assign', {
                 method: 'POST',
                 body: JSON.stringify({
