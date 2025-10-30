@@ -101,6 +101,7 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 		// Create new transaction without category (uncategorized)
 		transaction := &domain.Transaction{
 			ID:          uuid.New().String(),
+			Type:        domain.TransactionTypeNormal, // All imported transactions are normal type
 			AccountID:   accountID,
 			CategoryID:  nil, // Imported transactions start uncategorized
 			Amount:      ofxTxn.Amount,

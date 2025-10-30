@@ -37,9 +37,9 @@ func NewTransactionService(
 
 // CreateTransaction creates a new transaction and updates account balance
 // Handles three types of transactions:
-// 1. Normal income (positive amount): Increases account and Ready to Assign
-// 2. Normal expense (negative amount): Decreases account, requires category
-// 3. Credit card expense: Decreases card balance, moves budget from expense category to payment category
+// 1. Normal inflow (positive amount): Increases account and Ready to Assign
+// 2. Normal outflow (negative amount): Decreases account, requires category
+// 3. Credit card outflow: Decreases card balance, moves budget from spending category to payment category
 func (s *TransactionService) CreateTransaction(ctx context.Context, accountID string, categoryID *string, amount int64, description string, date time.Time) (*domain.Transaction, error) {
 	// Validate account exists
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -51,9 +51,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		return nil, fmt.Errorf("amount must be non-zero")
 	}
 
-	// For expenses (negative amounts), category is required
+	// For outflows (negative amounts), category is required
 	if amount < 0 && (categoryID == nil || *categoryID == "") {
-		return nil, fmt.Errorf("category is required for expense transactions")
+		return nil, fmt.Errorf("category is required for outflow transactions")
 	}
 
 	// Validate category if provided
