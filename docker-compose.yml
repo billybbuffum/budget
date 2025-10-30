@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Docker Compose v2+ uses BuildKit by default, enabling cache mounts
     container_name: budget-app
     ports:
       - "8080:8080"

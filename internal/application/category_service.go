@@ -21,11 +21,14 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 
 // CreateCategory creates a new category
 // Note: groupID is required - all categories must belong to a group
+// Note: This method is called directly from the API handler for user-created categories
+// AccountService uses the repository directly to create payment categories
 func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string, groupID *string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
 	}
 
+	// Require group_id for all user-created categories
 	if groupID == nil || *groupID == "" {
 		return nil, fmt.Errorf("group_id is required - all categories must belong to a group")
 	}
