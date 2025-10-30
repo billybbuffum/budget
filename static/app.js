@@ -209,7 +209,7 @@ async function loadBudgetView() {
         if (categories.length === 0) {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No expense categories yet.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No expense categories yet.</p>
                     <button onclick="showView('categories')" class="btn-primary">Create Your First Category</button>
                 </div>
             `;
@@ -232,7 +232,7 @@ async function loadBudgetView() {
             const allocatedDisplay = isPaymentCategory
                 ? `<div class="font-semibold" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
                 : `<div
-                    class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
+                    class="font-semibold cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
                     onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                     title="Click to edit allocation"
                 >
@@ -241,48 +241,48 @@ async function loadBudgetView() {
 
             // Underfunded warning for payment categories
             const underfundedWarning = isUnderfunded
-                ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="text-red-600 font-semibold">⚠️ Underfunded</span>
-                        <span class="text-red-700">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
+                        <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded</span>
+                        <span class="text-red-700 dark:text-red-300">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
                     </div>
                     ${summaryItem.underfunded_categories && summaryItem.underfunded_categories.length > 0
-                        ? `<div class="text-xs text-red-600 mt-1">
+                        ? `<div class="text-xs text-red-600 dark:text-red-400 mt-1">
                             <div class="font-semibold">Underfunded categories:</div>
                             <ul class="list-disc list-inside ml-2 mt-1">
                                 ${summaryItem.underfunded_categories.map(cat => `<li>${cat}</li>`).join('')}
                             </ul>
                             <div class="mt-1 italic">Allocate more to these categories to cover credit card spending</div>
                         </div>`
-                        : `<div class="text-xs text-red-600 mt-1">Allocate more to expense categories when using this card</div>`
+                        : `<div class="text-xs text-red-600 dark:text-red-400 mt-1">Allocate more to expense categories when using this card</div>`
                     }
                 </div>`
                 : '';
 
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50' : ''} ${isUnderfunded ? 'border-red-300' : ''}">
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''} ${isUnderfunded ? 'border-red-300 dark:border-red-700' : ''}">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-3 flex-1">
                             <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                             <div class="flex-1">
-                                <div class="font-semibold text-gray-800">
+                                <div class="font-semibold text-gray-800 dark:text-gray-100">
                                     ${category.name}
-                                    ${isPaymentCategory ? '<span class="ml-2 text-xs text-orange-600 font-normal">(Auto-managed)</span>' : ''}
+                                    ${isPaymentCategory ? '<span class="ml-2 text-xs text-orange-600 dark:text-orange-400 font-normal">(Auto-managed)</span>' : ''}
                                 </div>
-                                ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
+                                ${category.description ? `<div class="text-sm text-gray-500 dark:text-gray-400">${category.description}</div>` : ''}
                             </div>
                         </div>
                         <div class="flex gap-6 items-center">
                             <div class="text-right">
-                                <div class="text-xs text-gray-500">Allocated</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                                 ${allocatedDisplay}
                             </div>
                             <div class="text-right">
-                                <div class="text-xs text-gray-500">Spent</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
                                 <div class="font-semibold">${formatCurrency(spent)}</div>
                             </div>
                             <div class="text-right min-w-[100px]">
-                                <div class="text-xs text-gray-500">Available</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
                                 <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                             </div>
                         </div>
@@ -311,7 +311,7 @@ async function loadAccountsView() {
         if (accounts.length === 0) {
             accountsList.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No accounts yet. Create one to start tracking your money!</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No accounts yet. Create one to start tracking your money!</p>
                     <button onclick="showAddAccountModal()" class="btn-primary">Create Your First Account</button>
                 </div>
             `;
@@ -321,11 +321,11 @@ async function loadAccountsView() {
         accountsList.innerHTML = accounts.map(account => {
             const balanceClass = account.balance >= 0 ? 'text-green-600' : 'text-red-600';
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div>
-                            <div class="font-semibold text-gray-800">${account.name}</div>
-                            <div class="text-sm text-gray-500 capitalize">${account.type}</div>
+                            <div class="font-semibold text-gray-800 dark:text-gray-100">${account.name}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400 capitalize">${account.type}</div>
                         </div>
                         <div class="text-right">
                             <div class="text-xl font-bold ${balanceClass}">${formatCurrency(account.balance)}</div>
@@ -351,7 +351,7 @@ async function loadTransactionsView() {
         if (transactions.length === 0) {
             transactionsList.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No transactions yet.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No transactions yet.</p>
                     <button onclick="showAddTransactionModal()" class="btn-primary">Add Your First Transaction</button>
                 </div>
             `;
@@ -379,14 +379,14 @@ async function loadTransactionsView() {
             }
 
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 ${category ? `<div class="w-2 h-2 rounded-full" style="background-color: ${category.color || '#gray'}"></div>` : ''}
-                                <div class="font-semibold text-gray-800">${transaction.description || 'Transaction'}</div>
+                                <div class="font-semibold text-gray-800 dark:text-gray-100">${transaction.description || 'Transaction'}</div>
                             </div>
-                            <div class="text-sm text-gray-500 mt-1">
+                            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 ${transactionInfo}
                             </div>
                         </div>
@@ -412,7 +412,7 @@ async function loadCategoriesView() {
         const categoriesList = document.getElementById('categories-list');
 
         if (userCategories.length === 0) {
-            categoriesList.innerHTML = '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
+            categoriesList.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No categories yet.</div>';
         } else {
             categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
         }
@@ -423,12 +423,12 @@ async function loadCategoriesView() {
 
 function renderCategoryCard(category) {
     return `
-        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div class="flex items-center gap-3">
                 <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                 <div class="flex-1">
-                    <div class="font-semibold text-gray-800">${category.name}</div>
-                    ${category.description ? `<div class="text-sm text-gray-500">${category.description}</div>` : ''}
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                    ${category.description ? `<div class="text-sm text-gray-500 dark:text-gray-400">${category.description}</div>` : ''}
                 </div>
             </div>
         </div>
@@ -627,7 +627,7 @@ async function loadUncategorizedTransactions() {
         const listContainer = document.getElementById('uncategorized-list');
 
         if (transactions.length === 0) {
-            listContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No uncategorized transactions</p>';
+            listContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">No uncategorized transactions</p>';
             return;
         }
 
@@ -640,13 +640,13 @@ async function loadUncategorizedTransactions() {
                 const account = accounts.find(a => a.id === txn.account_id);
                 const amountClass = txn.amount >= 0 ? 'text-green-600' : 'text-red-600';
                 return `
-                    <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition">
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition">
                         <input type="checkbox" class="uncategorized-checkbox" data-transaction-id="${txn.id}">
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between items-start gap-2">
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-gray-800 truncate">${txn.description || 'No description'}</div>
-                                    <div class="text-xs text-gray-500">${account ? account.name : 'Unknown'} • ${new Date(txn.date).toLocaleDateString()}</div>
+                                    <div class="font-medium text-gray-800 dark:text-gray-100 truncate">${txn.description || 'No description'}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">${account ? account.name : 'Unknown'} • ${new Date(txn.date).toLocaleDateString()}</div>
                                 </div>
                                 <div class="font-semibold ${amountClass} whitespace-nowrap">${formatCurrency(txn.amount)}</div>
                             </div>
