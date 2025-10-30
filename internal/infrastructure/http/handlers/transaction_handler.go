@@ -81,11 +81,14 @@ func (h *TransactionHandler) ListTransactions(w http.ResponseWriter, r *http.Req
 	categoryID := r.URL.Query().Get("category_id")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
+	uncategorized := r.URL.Query().Get("uncategorized")
 
 	var transactions interface{}
 	var err error
 
-	if accountID != "" {
+	if uncategorized == "true" {
+		transactions, err = h.transactionService.ListUncategorizedTransactions(r.Context())
+	} else if accountID != "" {
 		transactions, err = h.transactionService.ListTransactionsByAccount(r.Context(), accountID)
 	} else if categoryID != "" {
 		transactions, err = h.transactionService.ListTransactionsByCategory(r.Context(), categoryID)
