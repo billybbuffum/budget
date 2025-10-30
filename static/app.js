@@ -208,6 +208,9 @@ async function loadBudgetView() {
 
         // Initialize drag-and-drop after rendering
         initializeBudgetDragDrop();
+
+        // Update expand/collapse all button text
+        updateExpandCollapseButton();
     } catch (error) {
         console.error('Failed to load budget view:', error);
     }
@@ -220,7 +223,10 @@ function renderBudgetWithGroups(summary) {
     const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
 
     // Initialize collapsed state: collapse all groups by default on first load
-    if (collapsedGroups.size === 0) {
+    // Only initialize if we haven't set any state yet (use a flag to track first load)
+    if (typeof window.budgetGroupsInitialized === 'undefined') {
+        window.budgetGroupsInitialized = true;
+        collapsedGroups.clear();
         sortedGroups.forEach(group => collapsedGroups.add(group.id));
     }
 
@@ -268,26 +274,26 @@ function renderGroupSection(group, groupCategories, summary) {
         : `<button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>`;
 
     return `
-        <div class="budget-group mb-4" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
-            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
+        <div class="budget-group mb-2" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
+            <div class="flex justify-between items-center mb-1 mx-px p-2 bg-gray-100 dark:bg-gray-700 rounded transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
                  onclick="toggleGroupCollapse('${group.id}')">
-                <div class="flex items-center gap-3 flex-1">
+                <div class="flex items-center gap-2 flex-1">
                     <span class="collapse-icon text-gray-600 dark:text-gray-400 select-none" style="font-size: 10px; width: 12px;">${chevron}</span>
-                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition no-drag" title="Drag to reorder" onclick="event.stopPropagation()">⋮⋮</span>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
+                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition no-drag text-xs" title="Drag to reorder" onclick="event.stopPropagation()">⋮⋮</span>
+                    <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 flex-1">
                         ${groupNameHtml}
                     </h3>
                 </div>
-                <div class="flex gap-6 items-center">
+                <div class="flex gap-4 items-center">
                     <!-- Invisible spacers to align with category columns -->
-                    <div class="w-24"></div>
-                    <div class="w-24"></div>
-                    <div class="w-24"></div>
+                    <div class="w-20"></div>
+                    <div class="w-20"></div>
+                    <div class="w-20"></div>
                     ${deleteButtonHtml}
                 </div>
             </div>
             <div class="group-content" ${contentDisplay}>
-                <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
+                <div class="group-categories space-y-1 min-h-[40px]" data-group-id="${group.id}">
                     ${categoriesHtml}
                 </div>
                 ${addCategoryButton}
@@ -318,20 +324,20 @@ function renderBudgetCategory(category, summary) {
             cardBalanceDisplay = `
                 <div class="text-right">
                     <div class="text-xs text-gray-500 dark:text-gray-400">Card Balance</div>
-                    <div class="font-semibold ${balanceClass}">${formatCurrency(cardBalance)}</div>
+                    <div class="font-medium text-sm ${balanceClass}">${formatCurrency(cardBalance)}</div>
                 </div>`;
         }
     }
 
     const allocatedDisplay = isPaymentCategory
-        ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
-        : `<div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
+        ? `<div class="font-medium text-sm text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
+        : `<div class="font-medium text-sm text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
                 onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                 title="Click to edit">${formatCurrency(allocated)}</div>`;
 
     const underfundedWarning = isUnderfunded
-        ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
-            <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+        ? `<div class="mt-1 p-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs">
+            <span class="text-red-600 dark:text-red-400 font-medium">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
         </div>` : '';
 
     const deleteButton = isPaymentCategory
@@ -342,19 +348,19 @@ function renderBudgetCategory(category, summary) {
                    title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
+        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
              data-category-id="${category.id}"
              data-payment-category="${isPaymentCategory}"
              data-group-id="${category.group_id || 'ungrouped'}">
             <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3 flex-1">
+                <div class="flex items-center gap-2 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
-                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
+                    <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                     <div class="flex-1">
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                        <div class="font-medium text-sm text-gray-800 dark:text-gray-100">${category.name}</div>
                     </div>
                 </div>
-                <div class="flex gap-6 items-center">
+                <div class="flex gap-4 items-center">
                     ${cardBalanceDisplay}
                     <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
@@ -362,11 +368,11 @@ function renderBudgetCategory(category, summary) {
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">${isPaymentCategory ? 'Paid' : 'Spent'}</div>
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
+                        <div class="font-medium text-sm text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
-                    <div class="text-right min-w-[100px]">
+                    <div class="text-right min-w-[80px]">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
-                        <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
+                        <div class="font-semibold text-sm ${availableClass}">${formatCurrency(available)}</div>
                     </div>
                     ${deleteButton}
                 </div>
@@ -505,11 +511,38 @@ function toggleGroupCollapse(groupId) {
     } else {
         collapsedGroups.add(groupId);
     }
+    updateExpandCollapseButton();
     loadBudgetView();
 }
 
-// Make toggleGroupCollapse available globally for onclick handler
+function toggleExpandCollapseAll() {
+    // If all groups are collapsed, expand all; otherwise collapse all
+    const allCollapsed = categoryGroups.length > 0 && collapsedGroups.size === categoryGroups.length;
+
+    if (allCollapsed) {
+        // Expand all
+        collapsedGroups.clear();
+    } else {
+        // Collapse all
+        collapsedGroups.clear();
+        categoryGroups.forEach(group => collapsedGroups.add(group.id));
+    }
+
+    updateExpandCollapseButton();
+    loadBudgetView();
+}
+
+function updateExpandCollapseButton() {
+    const button = document.getElementById('expand-collapse-btn');
+    if (!button) return;
+
+    const allCollapsed = categoryGroups.length > 0 && collapsedGroups.size === categoryGroups.length;
+    button.textContent = allCollapsed ? 'Expand All' : 'Collapse All';
+}
+
+// Make functions available globally for onclick handlers
 window.toggleGroupCollapse = toggleGroupCollapse;
+window.toggleExpandCollapseAll = toggleExpandCollapseAll;
 
 // Inline category management functions
 function showAddCategoryInline(groupId, event) {
