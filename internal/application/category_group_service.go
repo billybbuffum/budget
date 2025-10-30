@@ -127,9 +127,15 @@ func (s *CategoryGroupService) AssignCategoryToGroup(ctx context.Context, catego
 	}
 
 	// Verify the group exists
-	_, err = s.categoryGroupRepo.GetByID(ctx, groupID)
+	group, err := s.categoryGroupRepo.GetByID(ctx, groupID)
 	if err != nil {
 		return fmt.Errorf("category group not found: %w", err)
+	}
+
+	// Prevent assigning non-payment categories to the Credit Card Payments group
+	// Only auto-created payment categories should be in this group
+	if group.Name == domain.CreditCardPaymentsGroupName && category.PaymentForAccountID == nil {
+		return fmt.Errorf("cannot manually add categories to the Credit Card Payments group - it is auto-managed")
 	}
 
 	// Note: We no longer validate category-group type matching since categories don't have types
