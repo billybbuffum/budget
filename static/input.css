@@ -34,4 +34,13 @@
   .toast.active {
     @apply translate-x-0;
   }
+  .color-swatch {
+    @apply w-12 h-12 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all cursor-pointer relative flex items-center justify-center;
+  }
+  .color-swatch.selected {
+    @apply border-gray-700 ring-2 ring-gray-400;
+  }
+  .color-check {
+    @apply text-white font-bold text-lg drop-shadow-md;
+  }
 }
