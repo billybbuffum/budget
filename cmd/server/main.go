@@ -37,6 +37,7 @@ func main() {
 	// Initialize repositories
 	accountRepo := repository.NewAccountRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
+	categoryGroupRepo := repository.NewCategoryGroupRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
 	allocationRepo := repository.NewAllocationRepository(db)
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
@@ -47,6 +48,7 @@ func main() {
 	// Initialize services
 	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo)
 	categoryService := application.NewCategoryService(categoryRepo)
+	categoryGroupService := application.NewCategoryGroupService(categoryGroupRepo, categoryRepo)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, allocationRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo, accountRepo)
 	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser)
@@ -54,12 +56,13 @@ func main() {
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
+	categoryGroupHandler := handlers.NewCategoryGroupHandler(categoryGroupService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	allocationHandler := handlers.NewAllocationHandler(allocationService)
 	importHandler := handlers.NewImportHandler(importService)
 
 	// Setup router
-	router := http.NewRouter(accountHandler, categoryHandler, transactionHandler, allocationHandler, importHandler)
+	router := http.NewRouter(accountHandler, categoryHandler, categoryGroupHandler, transactionHandler, allocationHandler, importHandler)
 
 	// Create server
 	server := http.NewServer(fmt.Sprintf(":%s", cfg.Server.Port), router)

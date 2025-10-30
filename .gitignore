@@ -10,6 +10,7 @@
 budget-server
 budget-app
 budget
+bin/
 
 # Test binary, built with `go test -c`
 *.test

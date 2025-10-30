@@ -21,7 +21,17 @@ type CategoryRepository interface {
 	GetByID(ctx context.Context, id string) (*Category, error)
 	GetPaymentCategoryByAccountID(ctx context.Context, accountID string) (*Category, error)
 	List(ctx context.Context) ([]*Category, error)
+	ListByGroup(ctx context.Context, groupID string) ([]*Category, error)
 	Update(ctx context.Context, category *Category) error
+	Delete(ctx context.Context, id string) error
+}
+
+// CategoryGroupRepository defines the interface for category group data operations
+type CategoryGroupRepository interface {
+	Create(ctx context.Context, group *CategoryGroup) error
+	GetByID(ctx context.Context, id string) (*CategoryGroup, error)
+	List(ctx context.Context) ([]*CategoryGroup, error)
+	Update(ctx context.Context, group *CategoryGroup) error
 	Delete(ctx context.Context, id string) error
 }
 
