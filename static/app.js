@@ -1868,7 +1868,7 @@ async function renderUncategorizedTransactions() {
     if (!container) return;
 
     try {
-        const uncategorized = await apiCall('/transactions?uncategorized=true');
+        const uncategorized = await apiCall('/transactions?uncategorized=true') || [];
 
         // Filter to only show outflows (negative amounts) - inflows don't need categorization
         const outflows = uncategorized.filter(txn => txn.amount < 0);
