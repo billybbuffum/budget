@@ -20,7 +20,8 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 }
 
 // CreateCategory creates a new category
-func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string) (*domain.Category, error) {
+// Note: Categories no longer have types - only groups have types
+func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string, groupID *string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
 	}
@@ -30,6 +31,7 @@ func (s *CategoryService) CreateCategory(ctx context.Context, name, description,
 		Name:        name,
 		Description: description,
 		Color:       color,
+		GroupID:     groupID,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -52,7 +54,7 @@ func (s *CategoryService) ListCategories(ctx context.Context) ([]*domain.Categor
 }
 
 // UpdateCategory updates an existing category
-func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, description, color string) (*domain.Category, error) {
+func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, description, color string, groupID *string) (*domain.Category, error) {
 	category, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -66,6 +68,10 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, descript
 	}
 	if color != "" {
 		category.Color = color
+	}
+	// Allow explicit setting/unsetting of group_id
+	if groupID != nil {
+		category.GroupID = groupID
 	}
 	category.UpdatedAt = time.Now()
 

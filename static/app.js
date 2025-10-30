@@ -2,6 +2,7 @@
 let currentMonth = new Date();
 let accounts = [];
 let categories = [];
+let categoryGroups = [];
 let transactions = [];
 let allocations = [];
 
@@ -116,6 +117,11 @@ async function loadCategories() {
     return categories;
 }
 
+async function loadCategoryGroups() {
+    categoryGroups = await apiCall('/category-groups') || [];
+    return categoryGroups;
+}
+
 async function loadTransactions() {
     transactions = await apiCall('/transactions') || [];
     return transactions;
@@ -188,8 +194,7 @@ async function loadBudgetView() {
     document.getElementById('current-month').textContent = formatMonthYear();
 
     try {
-        await loadCategories();
-        await loadAllocations();
+        await Promise.all([loadCategories(), loadCategoryGroups(), loadAllocations()]);
         const summaryData = await loadAllocationSummary();
 
         // Extract ready_to_assign and categories from the response
@@ -199,7 +204,6 @@ async function loadBudgetView() {
         // Update Ready to Assign display with appropriate color
         const readyToAssignEl = document.getElementById('ready-to-assign');
         readyToAssignEl.textContent = formatCurrency(readyToAssign);
-        // Set color: red if negative, blue if positive
         if (readyToAssign < 0) {
             readyToAssignEl.className = 'text-3xl font-bold text-red-600';
         } else {
@@ -208,7 +212,6 @@ async function loadBudgetView() {
 
         const budgetCategories = document.getElementById('budget-categories');
 
-        // Show all categories including payment categories (so users can see CC payment allocations)
         if (categories.length === 0) {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
@@ -219,83 +222,218 @@ async function loadBudgetView() {
             return;
         }
 
-        budgetCategories.innerHTML = categories.map(category => {
-            const allocation = allocations.find(a => a.category_id === category.id);
-            const summaryItem = summary.find(s => s.category?.id === category.id);
+        // Render groups and ungrouped categories
+        budgetCategories.innerHTML = renderBudgetWithGroups(summary);
 
-            const allocated = allocation?.amount || 0;
-            const spent = summaryItem?.activity ? -summaryItem.activity : 0; // Activity is negative for expenses
-            const available = summaryItem?.available || (allocated - spent);
-
-            const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
-
-            // Payment categories are system-managed and cannot be manually edited
-            const isPaymentCategory = category.payment_for_account_id !== null && category.payment_for_account_id !== undefined;
-            const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
-            const allocatedDisplay = isPaymentCategory
-                ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated from credit card spending">${formatCurrency(allocated)}</div>`
-                : `<div
-                    class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
-                    onclick="startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
-                    title="Click to edit allocation"
-                >
-                    ${formatCurrency(allocated)}
-                </div>`;
-
-            // Underfunded warning for payment categories
-            const underfundedWarning = isUnderfunded
-                ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded</span>
-                        <span class="text-red-700 dark:text-red-300">Need ${formatCurrency(summaryItem.underfunded)} more to cover credit card balance</span>
-                    </div>
-                    ${summaryItem.underfunded_categories && summaryItem.underfunded_categories.length > 0
-                        ? `<div class="text-xs text-red-600 dark:text-red-400 mt-1">
-                            <div class="font-semibold">Underfunded categories:</div>
-                            <ul class="list-disc list-inside ml-2 mt-1">
-                                ${summaryItem.underfunded_categories.map(cat => `<li>${cat}</li>`).join('')}
-                            </ul>
-                            <div class="mt-1 italic">Allocate more to these categories to cover credit card spending</div>
-                        </div>`
-                        : `<div class="text-xs text-red-600 dark:text-red-400 mt-1">Allocate more to expense categories when using this card</div>`
-                    }
-                </div>`
-                : '';
-
-            return `
-                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''} ${isUnderfunded ? 'border-red-300 dark:border-red-700' : ''}">
-                    <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-3 flex-1">
-                            <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
-                            <div class="flex-1">
-                                <div class="font-semibold text-gray-800 dark:text-gray-100">
-                                    ${category.name}
-                                    ${isPaymentCategory ? '<span class="ml-2 text-xs text-orange-600 dark:text-orange-400 font-normal">(Auto-managed)</span>' : ''}
-                                </div>
-                                ${category.description ? `<div class="text-sm text-gray-500 dark:text-gray-400">${category.description}</div>` : ''}
-                            </div>
-                        </div>
-                        <div class="flex gap-6 items-center">
-                            <div class="text-right">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
-                                ${allocatedDisplay}
-                            </div>
-                            <div class="text-right">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
-                                <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
-                            </div>
-                            <div class="text-right min-w-[100px]">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
-                                <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    ${underfundedWarning}
-                </div>
-            `;
-        }).join('');
+        // Initialize drag-and-drop after rendering
+        initializeBudgetDragDrop();
     } catch (error) {
         console.error('Failed to load budget view:', error);
+    }
+}
+
+function renderBudgetWithGroups(summary) {
+    let html = '';
+
+    // Sort groups by display order
+    const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
+
+    // Render each group (including empty ones)
+    for (const group of sortedGroups) {
+        const groupCategories = categories.filter(c => c.group_id === group.id);
+        html += renderGroupSection(group, groupCategories, summary);
+    }
+
+    // Always render ungrouped section
+    const ungroupedCategories = categories.filter(c => !c.group_id);
+    html += renderUngroupedSection(ungroupedCategories, summary);
+
+    return html;
+}
+
+function renderGroupSection(group, groupCategories, summary) {
+    const categoriesHtml = groupCategories.length > 0
+        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>';
+
+    return `
+        <div class="budget-group mb-4" data-group-id="${group.id}">
+            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                <span class="drag-handle text-gray-400 dark:text-gray-500">⋮⋮</span>
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">${group.name}</h3>
+                <button onclick="deleteGroup('${group.id}')" class="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">Delete</button>
+            </div>
+            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
+                ${categoriesHtml}
+            </div>
+        </div>
+    `;
+}
+
+function renderUngroupedSection(ungroupedCategories, summary) {
+    const categoriesHtml = ungroupedCategories.length > 0
+        ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here to ungroup</div>';
+
+    return `
+        <div class="budget-group mb-4" data-group-id="ungrouped">
+            <h3 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2 p-2">Ungrouped</h3>
+            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
+                ${categoriesHtml}
+            </div>
+        </div>
+    `;
+}
+
+function renderBudgetCategory(category, summary) {
+    const allocation = allocations.find(a => a.category_id === category.id);
+    const summaryItem = summary.find(s => s.category?.id === category.id);
+
+    const allocated = allocation?.amount || 0;
+    const spent = summaryItem?.activity ? -summaryItem.activity : 0;
+    const available = summaryItem?.available || (allocated - spent);
+    const availableClass = available >= 0 ? 'text-green-600' : 'text-red-600';
+
+    const isPaymentCategory = category.payment_for_account_id != null;
+    const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
+
+    const allocatedDisplay = isPaymentCategory
+        ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
+        : `<div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
+                onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
+                title="Click to edit">${formatCurrency(allocated)}</div>`;
+
+    const underfundedWarning = isUnderfunded
+        ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
+            <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+        </div>` : '';
+
+    return `
+        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
+             data-category-id="${category.id}">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3 flex-1">
+                    <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
+                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                    </div>
+                </div>
+                <div class="flex gap-6 items-center">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
+                        ${allocatedDisplay}
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
+                    </div>
+                    <div class="text-right min-w-[100px]">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
+                        <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
+                    </div>
+                </div>
+            </div>
+            ${underfundedWarning}
+        </div>
+    `;
+}
+
+function initializeBudgetDragDrop() {
+    // Make groups sortable
+    const budgetContainer = document.getElementById('budget-categories');
+    if (budgetContainer && window.Sortable) {
+        new Sortable(budgetContainer, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'opacity-50',
+            onEnd: async function(evt) {
+                await updateGroupOrder();
+            }
+        });
+
+        // Make categories within each group sortable
+        document.querySelectorAll('.group-categories').forEach(groupEl => {
+            new Sortable(groupEl, {
+                group: 'categories',
+                animation: 150,
+                ghostClass: 'opacity-50',
+                filter: '.no-drag',
+                preventOnFilter: false,
+                onEnd: async function(evt) {
+                    const categoryId = evt.item.dataset.categoryId;
+                    const newGroupId = evt.to.dataset.groupId;
+                    await updateCategoryGroup(categoryId, newGroupId === 'ungrouped' ? null : newGroupId);
+                }
+            });
+        });
+    }
+}
+
+async function updateGroupOrder() {
+    const groups = [...document.querySelectorAll('.budget-group[data-group-id]:not([data-group-id="ungrouped"])')];
+    for (let i = 0; i < groups.length; i++) {
+        const groupId = groups[i].dataset.groupId;
+        try {
+            await apiCall(`/category-groups/${groupId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ display_order: i })
+            });
+        } catch (error) {
+            console.error('Failed to update group order:', error);
+        }
+    }
+}
+
+async function updateCategoryGroup(categoryId, groupId) {
+    try {
+        if (groupId) {
+            await apiCall('/category-groups/assign', {
+                method: 'POST',
+                body: JSON.stringify({ category_id: categoryId, group_id: groupId })
+            });
+        } else {
+            await apiCall(`/category-groups/unassign/${categoryId}`, { method: 'POST' });
+        }
+        showToast('Category moved successfully!');
+    } catch (error) {
+        console.error('Failed to update category group:', error);
+        loadBudgetView(); // Reload on error
+    }
+}
+
+async function showAddGroupInline() {
+    const name = prompt('Enter group name (e.g., Housing, Transportation):');
+    if (!name) return;
+
+    try {
+        const maxOrder = Math.max(0, ...categoryGroups.map(g => g.display_order));
+        await apiCall('/category-groups', {
+            method: 'POST',
+            body: JSON.stringify({
+                name,
+                description: '',
+                display_order: maxOrder + 1
+            })
+        });
+        await loadCategoryGroups();
+        loadBudgetView();
+        showToast('Group created successfully!');
+    } catch (error) {
+        console.error('Failed to create group:', error);
+    }
+}
+
+async function deleteGroup(groupId) {
+    if (!confirm('Delete this group? Categories will be moved to Ungrouped.')) return;
+
+    try {
+        await apiCall(`/category-groups/${groupId}`, { method: 'DELETE' });
+        await loadCategoryGroups();
+        loadBudgetView();
+        showToast('Group deleted successfully!');
+    } catch (error) {
+        console.error('Failed to delete group:', error);
     }
 }
 
@@ -417,11 +555,47 @@ async function loadCategoriesView() {
         if (userCategories.length === 0) {
             categoriesList.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No categories yet.</div>';
         } else {
+            // Show flat list of categories (groups are managed on budget page)
             categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
         }
     } catch (error) {
         console.error('Failed to load categories view:', error);
     }
+}
+
+function renderCategoriesByGroups(categoriesList, groups) {
+    let html = '';
+
+    // Render groups with their categories
+    for (const group of groups) {
+        const groupCategories = categoriesList.filter(c => c.group_id === group.id);
+        if (groupCategories.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">${group.name}</h3>
+                    ${group.description ? `<p class="text-sm text-gray-500 mb-3">${group.description}</p>` : ''}
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        ${groupCategories.map(category => renderCategoryCard(category)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Render ungrouped categories
+    const ungroupedCategories = categoriesList.filter(c => !c.group_id);
+    if (ungroupedCategories.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Ungrouped</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${ungroupedCategories.map(category => renderCategoryCard(category)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    return html || '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
 }
 
 function renderCategoryCard(category) {
@@ -518,6 +692,7 @@ function showAddAccountModal() {
 
 function showAddCategoryModal() {
     document.getElementById('category-form').reset();
+
     // Reset color swatches to default (blue)
     document.querySelectorAll('.color-swatch').forEach(swatch => {
         swatch.classList.remove('selected');

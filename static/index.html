@@ -62,11 +62,14 @@
 
                     <div class="mb-4 flex justify-between items-center">
                         <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Categories</h3>
-                        <button onclick="showView('categories')" class="btn-secondary text-sm">Manage Categories</button>
+                        <div class="flex gap-2">
+                            <button onclick="showAddGroupInline()" class="btn-secondary text-sm">+ Add Group</button>
+                            <button onclick="showView('categories')" class="btn-secondary text-sm">Manage Categories</button>
+                        </div>
                     </div>
 
-                    <div id="budget-categories" class="space-y-2">
-                        <!-- Categories will be loaded here -->
+                    <div id="budget-categories" class="space-y-4">
+                        <!-- Groups and categories will be loaded here with drag-and-drop -->
                     </div>
                 </div>
             </div>
@@ -377,6 +380,8 @@
         </div>
     </div>
 
+    <!-- SortableJS for drag-and-drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.1/Sortable.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
