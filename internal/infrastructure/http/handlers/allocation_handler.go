@@ -93,12 +93,31 @@ func (h *AllocationHandler) GetAllocationSummary(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Calculate Ready to Assign for this period
+	readyToAssign, err := h.allocationService.CalculateReadyToAssignForPeriod(r.Context(), period)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Include Ready to Assign in response
+	response := map[string]interface{}{
+		"categories":      summary,
+		"ready_to_assign": readyToAssign,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *AllocationHandler) GetReadyToAssign(w http.ResponseWriter, r *http.Request) {
-	readyToAssign, err := h.allocationService.GetReadyToAssign(r.Context())
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		http.Error(w, "period query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	readyToAssign, err := h.allocationService.CalculateReadyToAssignForPeriod(r.Context(), period)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

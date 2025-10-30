@@ -158,10 +158,21 @@ async function loadBudgetView() {
     try {
         await loadCategories();
         await loadAllocations();
-        const readyToAssign = await loadReadyToAssign();
-        const summary = await loadAllocationSummary();
+        const summaryData = await loadAllocationSummary();
 
-        document.getElementById('ready-to-assign').textContent = formatCurrency(readyToAssign);
+        // Extract ready_to_assign and categories from the response
+        const readyToAssign = summaryData?.ready_to_assign || 0;
+        const summary = summaryData?.categories || [];
+
+        // Update Ready to Assign display with appropriate color
+        const readyToAssignEl = document.getElementById('ready-to-assign');
+        readyToAssignEl.textContent = formatCurrency(readyToAssign);
+        // Set color: red if negative, blue if positive
+        if (readyToAssign < 0) {
+            readyToAssignEl.className = 'text-3xl font-bold text-red-600';
+        } else {
+            readyToAssignEl.className = 'text-3xl font-bold text-blue-600';
+        }
 
         const budgetCategories = document.getElementById('budget-categories');
 

@@ -88,24 +88,9 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 		return nil, fmt.Errorf("failed to update account balance: %w", err)
 	}
 
-	// Handle different transaction types
-	if amount > 0 {
-		// INCOME: Increase Ready to Assign
-		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, amount); err != nil {
-			// Rollback if Ready to Assign update fails
-			s.accountRepo.Update(ctx, &domain.Account{
-				ID:        account.ID,
-				Balance:   account.Balance - amount,
-				UpdatedAt: time.Now(),
-			})
-			s.transactionRepo.Delete(ctx, transaction.ID)
-			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
-		}
-	} else if account.Type == domain.AccountTypeCredit && categoryID != nil {
-		// CREDIT CARD SPENDING: Move budgeted money from expense category to payment category
-		// Only move money that's actually budgeted in the expense category
-		// If overspending (spending more than allocated), only move what's available
-
+	// CREDIT CARD SPENDING: Move budgeted money from expense category to payment category
+	// Only move money that's actually budgeted in the expense category
+	if account.Type == domain.AccountTypeCredit && categoryID != nil && amount < 0 {
 		// Get the payment category for this credit card
 		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
 		if err != nil {
@@ -143,8 +128,8 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 					// Only include transactions BEFORE the one we just created
 					// (exclude the current transaction ID)
 					if txn.ID != transaction.ID &&
-					   (txnDate.After(startDate) || txnDate.Equal(startDate)) &&
-					   (txnDate.Before(endDate) || txnDate.Equal(endDate)) {
+						(txnDate.After(startDate) || txnDate.Equal(startDate)) &&
+						(txnDate.Before(endDate) || txnDate.Equal(endDate)) {
 						totalActivity += txn.Amount
 					}
 				}
@@ -207,11 +192,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, accountID st
 				}
 			}
 		}
-		// Note: We don't decrease Ready to Assign because the money was already allocated
-		// to the expense category. The allocation just moved from expense → payment category.
 	}
-	// For regular expense on non-credit accounts, no special handling needed
-	// The money was allocated to the expense category and is now spent
 
 	return transaction, nil
 }
@@ -474,13 +455,6 @@ func (s *TransactionService) DeleteTransaction(ctx context.Context, id string) e
 	// Then update account balance
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return fmt.Errorf("failed to update account balance: %w", err)
-	}
-
-	// If this was an income transaction, decrease Ready to Assign
-	if transaction.Amount > 0 {
-		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -transaction.Amount); err != nil {
-			return fmt.Errorf("failed to adjust ready to assign: %w", err)
-		}
 	}
 
 	return nil
