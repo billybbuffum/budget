@@ -980,10 +980,64 @@ function showAddCategoryModal() {
 
 function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
     document.getElementById('allocation-category-id').value = categoryId;
+    document.getElementById('allocation-current-amount').value = currentAmount; // Store in cents
     document.getElementById('allocation-category-name').textContent = categoryName;
     document.getElementById('allocation-amount').value = (currentAmount / 100).toFixed(2);
     document.getElementById('allocation-notes').value = '';
     showModal('allocation-modal');
+}
+
+// Helper function to parse allocation input with math operators
+function parseAllocationInput(inputValue, currentAmountInCents) {
+    const trimmed = inputValue.trim();
+
+    // Check if input starts with a math operator
+    const operatorMatch = trimmed.match(/^([+\-*/])(.+)$/);
+
+    if (operatorMatch) {
+        const operator = operatorMatch[1];
+        const operand = parseFloat(operatorMatch[2]);
+
+        if (isNaN(operand)) {
+            return { valid: false, error: 'Invalid number after operator' };
+        }
+
+        const currentAmountInDollars = currentAmountInCents / 100;
+        let result;
+
+        switch (operator) {
+            case '+':
+                result = currentAmountInDollars + operand;
+                break;
+            case '-':
+                result = currentAmountInDollars - operand;
+                break;
+            case '*':
+                result = currentAmountInDollars * operand;
+                break;
+            case '/':
+                if (operand === 0) {
+                    return { valid: false, error: 'Cannot divide by zero' };
+                }
+                result = currentAmountInDollars / operand;
+                break;
+        }
+
+        if (result < 0) {
+            return { valid: false, error: 'Result cannot be negative' };
+        }
+
+        return { valid: true, amountInCents: Math.round(result * 100) };
+    }
+
+    // No operator, treat as absolute value
+    const amount = parseFloat(trimmed);
+
+    if (isNaN(amount) || amount < 0) {
+        return { valid: false, error: 'Please enter a valid amount' };
+    }
+
+    return { valid: true, amountInCents: Math.round(amount * 100) };
 }
 
 // Inline editing for budget allocation
@@ -997,11 +1051,10 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
 
     // Create input element
     const input = document.createElement('input');
-    input.type = 'number';
-    input.step = '0.01';
-    input.min = '0';
+    input.type = 'text';
     input.value = (currentAmount / 100).toFixed(2);
     input.className = 'w-24 border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-center font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+    input.placeholder = 'e.g. +50, -25, 100';
 
     // Replace content with input
     clickedElement.innerHTML = '';
@@ -1011,15 +1064,15 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
 
     // Function to save the allocation
     const saveAllocation = async () => {
-        const newAmount = parseFloat(input.value);
+        const result = parseAllocationInput(input.value, currentAmount);
 
-        if (isNaN(newAmount) || newAmount < 0) {
-            showToast('Please enter a valid amount', 'error');
+        if (!result.valid) {
+            showToast(result.error, 'error');
             clickedElement.innerHTML = originalContent;
             return;
         }
 
-        const amountInCents = Math.round(newAmount * 100);
+        const amountInCents = result.amountInCents;
 
         // Only save if the amount changed
         if (amountInCents !== currentAmount) {
@@ -1602,16 +1655,24 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         const categoryId = document.getElementById('allocation-category-id').value;
-        const amount = parseFloat(document.getElementById('allocation-amount').value);
+        const currentAmount = parseInt(document.getElementById('allocation-current-amount').value) || 0;
+        const inputValue = document.getElementById('allocation-amount').value;
         const notes = document.getElementById('allocation-notes').value;
         const period = getCurrentPeriod();
+
+        const result = parseAllocationInput(inputValue, currentAmount);
+
+        if (!result.valid) {
+            showToast(result.error, 'error');
+            return;
+        }
 
         try {
             await apiCall('/allocations', {
                 method: 'POST',
                 body: JSON.stringify({
                     category_id: categoryId,
-                    amount: Math.round(amount * 100),
+                    amount: result.amountInCents,
                     period,
                     notes
                 })
