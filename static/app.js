@@ -6,6 +6,38 @@ let categoryGroups = [];
 let transactions = [];
 let allocations = [];
 
+// Theme management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        updateThemeIcon('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+        updateThemeIcon('light');
+    }
+}
+
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    const theme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+    updateThemeIcon(theme);
+}
+
+function updateThemeIcon(theme) {
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+        icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+}
+
+// Make toggleTheme available globally for onclick handler
+window.toggleTheme = toggleTheme;
+
 // Utility functions
 function formatCurrency(cents) {
     return new Intl.NumberFormat('en-US', {
@@ -180,7 +212,7 @@ async function loadBudgetView() {
         if (categories.length === 0) {
             budgetCategories.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No expense categories yet.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No expense categories yet.</p>
                     <button onclick="showView('categories')" class="btn-primary">Create Your First Category</button>
                 </div>
             `;
@@ -219,16 +251,16 @@ function renderBudgetWithGroups(summary) {
 function renderGroupSection(group, groupCategories, summary) {
     const categoriesHtml = groupCategories.length > 0
         ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 text-sm p-4 border-2 border-dashed border-gray-200 rounded text-center">Drag categories here</div>';
+        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>';
 
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}">
-            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded cursor-move hover:bg-gray-200 transition group">
-                <span class="drag-handle text-gray-400">⋮⋮</span>
-                <h3 class="text-lg font-semibold text-gray-700 flex-1 cursor-pointer hover:bg-gray-300 rounded px-2 py-1 -mx-2 -my-1"
+            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-600 transition group">
+                <span class="drag-handle text-gray-400 dark:text-gray-500">⋮⋮</span>
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1 cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-500 rounded px-2 py-1 -mx-2 -my-1"
                     onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
                     title="Click to edit group name">${group.name}</h3>
-                <button onclick="event.stopPropagation(); deleteGroup('${group.id}');" class="text-xs text-red-600 hover:text-red-800 no-drag" title="Delete group">Delete</button>
+                <button onclick="event.stopPropagation(); deleteGroup('${group.id}');" class="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 no-drag" title="Delete group">Delete</button>
             </div>
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
@@ -241,11 +273,11 @@ function renderGroupSection(group, groupCategories, summary) {
 function renderUngroupedSection(ungroupedCategories, summary) {
     const categoriesHtml = ungroupedCategories.length > 0
         ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 text-sm p-4 border-2 border-dashed border-gray-200 rounded text-center">Drag categories here to ungroup</div>';
+        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here to ungroup</div>';
 
     return `
         <div class="budget-group mb-4" data-group-id="ungrouped">
-            <h3 class="text-lg font-semibold text-gray-500 mb-2 p-2">Ungrouped</h3>
+            <h3 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2 p-2">Ungrouped</h3>
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
@@ -267,14 +299,14 @@ function renderBudgetCategory(category, summary) {
     const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
 
     const allocatedDisplay = isPaymentCategory
-        ? `<div class="font-semibold" title="Auto-allocated">${formatCurrency(allocated)}</div>`
-        : `<div class="font-semibold cursor-pointer hover:bg-blue-50 rounded px-2 py-1 -mx-2 -my-1 no-drag"
+        ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
+        : `<div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
                 onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                 title="Click to edit">${formatCurrency(allocated)}</div>`;
 
     const underfundedWarning = isUnderfunded
-        ? `<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
-            <span class="text-red-600 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+        ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
+            <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
         </div>` : '';
 
     const deleteButton = isPaymentCategory
@@ -285,33 +317,33 @@ function renderBudgetCategory(category, summary) {
                    title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category group relative border border-gray-200 rounded-lg p-4 bg-white cursor-move ${isPaymentCategory ? 'bg-orange-50' : ''}"
+        <div class="budget-category group relative border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
              data-category-id="${category.id}">
             ${deleteButton}
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
-                    <span class="text-gray-400 text-xs">⋮⋮</span>
-                    <div class="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 no-drag"
+                    <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
+                    <div class="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 dark:hover:ring-blue-600 no-drag"
                          style="background-color: ${category.color || '#3b82f6'}"
                          onclick="event.stopPropagation(); showColorPicker('${category.id}', '${category.color || '#3b82f6'}');"
                          title="Click to change color"></div>
                     <div class="flex-1">
-                        <div class="font-semibold text-gray-800 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 no-drag inline-block"
+                        <div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1 no-drag inline-block"
                              onclick="event.stopPropagation(); startCategoryNameEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}')"
                              title="Click to edit name">${category.name}</div>
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
                     <div class="text-right">
-                        <div class="text-xs text-gray-500">Allocated</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
                     <div class="text-right">
-                        <div class="text-xs text-gray-500">Spent</div>
-                        <div class="font-semibold">${formatCurrency(spent)}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
+                        <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
                     <div class="text-right min-w-[100px]">
-                        <div class="text-xs text-gray-500">Available</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
                         <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                     </div>
                 </div>
@@ -434,7 +466,7 @@ async function loadAccountsView() {
         if (accounts.length === 0) {
             accountsList.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No accounts yet. Create one to start tracking your money!</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No accounts yet. Create one to start tracking your money!</p>
                     <button onclick="showAddAccountModal()" class="btn-primary">Create Your First Account</button>
                 </div>
             `;
@@ -444,11 +476,11 @@ async function loadAccountsView() {
         accountsList.innerHTML = accounts.map(account => {
             const balanceClass = account.balance >= 0 ? 'text-green-600' : 'text-red-600';
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div>
-                            <div class="font-semibold text-gray-800">${account.name}</div>
-                            <div class="text-sm text-gray-500 capitalize">${account.type}</div>
+                            <div class="font-semibold text-gray-800 dark:text-gray-100">${account.name}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400 capitalize">${account.type}</div>
                         </div>
                         <div class="text-right">
                             <div class="text-xl font-bold ${balanceClass}">${formatCurrency(account.balance)}</div>
@@ -474,7 +506,7 @@ async function loadTransactionsView() {
         if (transactions.length === 0) {
             transactionsList.innerHTML = `
                 <div class="text-center py-12">
-                    <p class="text-gray-500 mb-4">No transactions yet.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mb-4">No transactions yet.</p>
                     <button onclick="showAddTransactionModal()" class="btn-primary">Add Your First Transaction</button>
                 </div>
             `;
@@ -502,14 +534,14 @@ async function loadTransactionsView() {
             }
 
             return `
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
                         <div class="flex-1">
                             <div class="flex items-center gap-2">
                                 ${category ? `<div class="w-2 h-2 rounded-full" style="background-color: ${category.color || '#gray'}"></div>` : ''}
-                                <div class="font-semibold text-gray-800">${transaction.description || 'Transaction'}</div>
+                                <div class="font-semibold text-gray-800 dark:text-gray-100">${transaction.description || 'Transaction'}</div>
                             </div>
-                            <div class="text-sm text-gray-500 mt-1">
+                            <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 ${transactionInfo}
                             </div>
                         </div>
@@ -626,7 +658,7 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     input.step = '0.01';
     input.min = '0';
     input.value = (currentAmount / 100).toFixed(2);
-    input.className = 'w-24 border border-blue-500 rounded px-2 py-1 text-center font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500';
+    input.className = 'w-24 border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-center font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
 
     // Replace content with input
     clickedElement.innerHTML = '';
@@ -1054,7 +1086,7 @@ async function loadUncategorizedTransactions() {
         const listContainer = document.getElementById('uncategorized-list');
 
         if (transactions.length === 0) {
-            listContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No uncategorized transactions</p>';
+            listContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">No uncategorized transactions</p>';
             return;
         }
 
@@ -1067,13 +1099,13 @@ async function loadUncategorizedTransactions() {
                 const account = accounts.find(a => a.id === txn.account_id);
                 const amountClass = txn.amount >= 0 ? 'text-green-600' : 'text-red-600';
                 return `
-                    <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition">
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition">
                         <input type="checkbox" class="uncategorized-checkbox" data-transaction-id="${txn.id}">
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between items-start gap-2">
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-medium text-gray-800 truncate">${txn.description || 'No description'}</div>
-                                    <div class="text-xs text-gray-500">${account ? account.name : 'Unknown'} • ${new Date(txn.date).toLocaleDateString()}</div>
+                                    <div class="font-medium text-gray-800 dark:text-gray-100 truncate">${txn.description || 'No description'}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">${account ? account.name : 'Unknown'} • ${new Date(txn.date).toLocaleDateString()}</div>
                                 </div>
                                 <div class="font-semibold ${amountClass} whitespace-nowrap">${formatCurrency(txn.amount)}</div>
                             </div>
@@ -1128,6 +1160,9 @@ async function loadImportView() {
 
 // Form submissions
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize theme
+    initializeTheme();
+
     // Add listener for transaction type change to update category requirement
     document.getElementById('transaction-type').addEventListener('change', function() {
         const categorySelect = document.getElementById('transaction-category');
