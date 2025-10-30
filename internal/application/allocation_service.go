@@ -417,29 +417,12 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 		}
 	}
 
-	// Get all transactions through this period
-	allTransactions, err := s.transactionRepo.List(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to list transactions: %w", err)
-	}
-
-	// Calculate total spent through this period (negative transactions = spending)
-	// IMPORTANT: Exclude transfers - they move money between accounts but don't "free up" allocated funds
-	var totalSpent int64
-	for _, txn := range allTransactions {
-		// Extract period from transaction date (YYYY-MM)
-		txnPeriod := txn.Date.Format("2006-01")
-
-		// Only count actual spending (negative amounts) through this period
-		// Skip transfers - they just move money between accounts
-		if txn.Amount < 0 && txnPeriod <= period && txn.Type != "transfer" {
-			totalSpent += -txn.Amount // Convert to positive
-		}
-	}
-
-	// Ready to Assign = Total Account Balance - (Allocated - Spent)
+	// Ready to Assign = Total Account Balance - Total Allocated
+	// Account balance already reflects all transactions (inflows and outflows).
+	// When you spend money, it reduces account balance immediately.
+	// When you categorize those transactions later, they count as "spent" against category budgets.
 	// This can be negative if over-allocated!
-	return totalAccountBalance - (totalAllocations - totalSpent), nil
+	return totalAccountBalance - totalAllocations, nil
 }
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
