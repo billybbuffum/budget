@@ -94,7 +94,10 @@
 
                     <div class="mb-4 flex justify-between items-center">
                         <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Categories</h3>
-                        <button onclick="showAddGroupInline()" class="btn-secondary text-sm">+ Add Group</button>
+                        <div class="flex gap-2">
+                            <button onclick="toggleExpandCollapseAll()" id="expand-collapse-btn" class="btn-secondary text-sm">Expand All</button>
+                            <button onclick="showAddGroupInline()" class="btn-secondary text-sm">+ Add Group</button>
+                        </div>
                     </div>
 
                     <div id="budget-categories" class="space-y-4">
