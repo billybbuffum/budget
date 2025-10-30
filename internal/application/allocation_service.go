@@ -282,7 +282,9 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 
 		var totalSpent int64
 		for _, txn := range allTransactions {
-			if txn.Amount < 0 {
+			// Only count actual spending, not transfers
+			// Transfers just move money between accounts and are already reflected in balances
+			if txn.Amount < 0 && txn.Type != "transfer" {
 				totalSpent += -txn.Amount // Convert to positive for display
 			}
 		}
@@ -405,13 +407,15 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 	}
 
 	// Calculate total spent through this period (negative transactions = spending)
+	// IMPORTANT: Exclude transfers - they move money between accounts but don't "free up" allocated funds
 	var totalSpent int64
 	for _, txn := range allTransactions {
 		// Extract period from transaction date (YYYY-MM)
 		txnPeriod := txn.Date.Format("2006-01")
 
-		// Only count spending (negative amounts) through this period
-		if txn.Amount < 0 && txnPeriod <= period {
+		// Only count actual spending (negative amounts) through this period
+		// Skip transfers - they just move money between accounts
+		if txn.Amount < 0 && txnPeriod <= period && txn.Type != "transfer" {
 			totalSpent += -txn.Amount // Convert to positive
 		}
 	}
