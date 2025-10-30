@@ -270,7 +270,7 @@ function renderGroupSection(group, groupCategories, summary) {
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
             <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
-                 onclick="toggleGroupCollapse('${group.id}')">`
+                 onclick="toggleGroupCollapse('${group.id}')">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="collapse-icon text-gray-600 dark:text-gray-400 select-none" style="font-size: 10px; width: 12px;">${chevron}</span>
                     <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition no-drag" title="Drag to reorder" onclick="event.stopPropagation()">⋮⋮</span>
@@ -1271,6 +1271,12 @@ async function startGroupNameEdit(groupId, currentName) {
 
     input.addEventListener('blur', () => {
         setTimeout(() => saveName(), 100);
+    });
+}
+
+// Make function globally available
+window.startGroupNameEdit = startGroupNameEdit;
+
 // Load uncategorized transactions
 async function loadUncategorizedTransactions() {
     try {
