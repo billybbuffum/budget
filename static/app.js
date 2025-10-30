@@ -359,7 +359,7 @@ function renderBudgetCategory(category, summary) {
                         ${allocatedDisplay}
                     </div>
                     <div class="text-right">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${isPaymentCategory ? 'Paid' : 'Spent'}</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
                     <div class="text-right min-w-[100px]">
