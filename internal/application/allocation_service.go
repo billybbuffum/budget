@@ -393,10 +393,26 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 		return 0, fmt.Errorf("failed to list allocations: %w", err)
 	}
 
+	// Get all categories to check which are payment categories
+	allCategories, err := s.categoryRepo.List(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list categories: %w", err)
+	}
+
+	// Build map of payment category IDs
+	paymentCategoryIDs := make(map[string]bool)
+	for _, cat := range allCategories {
+		if cat.PaymentForAccountID != nil && *cat.PaymentForAccountID != "" {
+			paymentCategoryIDs[cat.ID] = true
+		}
+	}
+
 	// Calculate total allocations through this period
+	// EXCLUDE payment category allocations - they don't represent "new" money allocation
+	// Payment allocations just track CC debt covered by expense budgets
 	var totalAllocations int64
 	for _, alloc := range allAllocations {
-		if alloc.Period <= period {
+		if alloc.Period <= period && !paymentCategoryIDs[alloc.CategoryID] {
 			totalAllocations += alloc.Amount
 		}
 	}
