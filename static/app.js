@@ -253,15 +253,30 @@ function renderGroupSection(group, groupCategories, summary) {
         ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
         : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>';
 
+    // Check if this is the Credit Card Payments group (protected from user modifications)
+    const isCreditCardPaymentsGroup = group.name === 'Credit Card Payments';
+
+    // Conditionally render edit functionality and delete button
+    const groupNameHtml = isCreditCardPaymentsGroup
+        ? `<span class="px-2 py-1 -mx-2 -my-1 inline-block">${group.name}</span>`
+        : `<span class="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded px-2 py-1 -mx-2 -my-1 inline-block no-drag"
+                 onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
+                 title="Click to edit group name">${group.name}</span>`;
+
+    const deleteButtonHtml = isCreditCardPaymentsGroup
+        ? '<div class="ml-3 w-5 h-5"></div>' // Empty spacer to maintain layout
+        : `<button onclick="event.stopPropagation(); deleteGroup('${group.id}');"
+                   class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
+                   style="font-size: 12px;"
+                   title="Delete group">✕</button>`;
+
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}">
             <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
                     <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
-                        <span class="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded px-2 py-1 -mx-2 -my-1 inline-block no-drag"
-                              onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
-                              title="Click to edit group name">${group.name}</span>
+                        ${groupNameHtml}
                     </h3>
                 </div>
                 <div class="flex gap-6 items-center">
@@ -269,10 +284,7 @@ function renderGroupSection(group, groupCategories, summary) {
                     <div class="w-24"></div>
                     <div class="w-24"></div>
                     <div class="w-24"></div>
-                    <button onclick="event.stopPropagation(); deleteGroup('${group.id}');"
-                            class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
-                            style="font-size: 12px;"
-                            title="Delete group">✕</button>
+                    ${deleteButtonHtml}
                 </div>
             </div>
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
