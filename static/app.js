@@ -1645,9 +1645,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('account-form').reset();
             showToast('Account created successfully!');
 
-            // Reload accounts and sidebar
+            // Reload accounts, sidebar, and budget view to update RTA
             await loadAccounts();
             await loadSidebar();
+            await loadBudgetView();
         } catch (error) {
             console.error('Failed to create account:', error);
         }
@@ -1868,7 +1869,7 @@ async function renderUncategorizedTransactions() {
     if (!container) return;
 
     try {
-        const uncategorized = await apiCall('/transactions?uncategorized=true');
+        const uncategorized = await apiCall('/transactions?uncategorized=true') || [];
 
         // Filter to only show outflows (negative amounts) - inflows don't need categorization
         const outflows = uncategorized.filter(txn => txn.amount < 0);
