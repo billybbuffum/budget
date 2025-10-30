@@ -9,6 +9,7 @@ const (
 	AccountTypeChecking AccountType = "checking"
 	AccountTypeSavings  AccountType = "savings"
 	AccountTypeCash     AccountType = "cash"
+	AccountTypeCredit   AccountType = "credit" // Credit cards - negative balance = debt
 )
 
 // Account represents a financial account that holds money
