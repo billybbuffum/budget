@@ -246,7 +246,7 @@ function renderGroupSection(group, groupCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -262,7 +262,7 @@ function renderUngroupedSection(ungroupedCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
+            <button onclick="showAddCategoryInline(null, event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -428,7 +428,7 @@ async function deleteGroup(groupId) {
 }
 
 // Inline category management functions
-function showAddCategoryInline(groupId) {
+function showAddCategoryInline(groupId, event) {
     const colors = [
         { hex: '#f97316', name: 'Orange' },
         { hex: '#3b82f6', name: 'Blue' },
@@ -483,11 +483,24 @@ function showAddCategoryInline(groupId) {
     if (existing) existing.remove();
 
     // Find the right place to insert the form
-    const targetButton = event.target;
-    targetButton.insertAdjacentHTML('beforebegin', formHtml);
+    const targetButton = event ? event.target : document.querySelector(`button[onclick*="showAddCategoryInline"]`);
+    if (targetButton) {
+        targetButton.insertAdjacentHTML('beforebegin', formHtml);
+    } else {
+        // Fallback: append to the appropriate group container
+        const targetContainer = groupId
+            ? document.querySelector(`.group-categories[data-group-id="${groupId}"]`)
+            : document.querySelector('.group-categories[data-group-id="ungrouped"]');
+        if (targetContainer) {
+            targetContainer.insertAdjacentHTML('afterend', formHtml);
+        }
+    }
 
     // Focus on name input
-    document.getElementById('inline-category-name').focus();
+    setTimeout(() => {
+        const nameInput = document.getElementById('inline-category-name');
+        if (nameInput) nameInput.focus();
+    }, 50);
 
     // Highlight default color
     selectInlineColor('#3b82f6');
