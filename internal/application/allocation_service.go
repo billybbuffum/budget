@@ -376,15 +376,24 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 // This represents: "How much money do I have that isn't allocated to a category?"
 // Note: This calculation ignores future periods to allow forward budgeting
 func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context, period string) (int64, error) {
-	// Get total account balance (all money available)
-	allAccounts, err := s.accountRepo.List(ctx)
+	// Ready to Assign = Total Inflows - Total Allocated
+	// This shows how much INCOME is available to allocate, not account balance.
+	// Account balance is lower due to spending, but inflows are what you budget from.
+
+	// Get all transactions to calculate inflows
+	allTransactions, err := s.transactionRepo.List(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list accounts: %w", err)
+		return 0, fmt.Errorf("failed to list transactions: %w", err)
 	}
 
-	var totalAccountBalance int64
-	for _, account := range allAccounts {
-		totalAccountBalance += account.Balance
+	// Calculate total inflows through this period
+	// Only count positive amounts (inflows), exclude transfers
+	var totalInflows int64
+	for _, txn := range allTransactions {
+		txnPeriod := txn.Date.Format("2006-01")
+		if txn.Amount > 0 && txnPeriod <= period && txn.Type != "transfer" {
+			totalInflows += txn.Amount
+		}
 	}
 
 	// Get all allocations through this period
@@ -417,12 +426,11 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 		}
 	}
 
-	// Ready to Assign = Total Account Balance - Total Allocated
-	// Account balance already reflects all transactions (inflows and outflows).
-	// When you spend money, it reduces account balance immediately.
-	// When you categorize those transactions later, they count as "spent" against category budgets.
-	// This can be negative if over-allocated!
-	return totalAccountBalance - totalAllocations, nil
+	// Ready to Assign = Total Inflows - Total Allocated
+	// This can be negative if you over-allocated!
+	// When you categorize unbudgeted spending, categories go negative (overspent).
+	// You must then allocate money to cover the overspending, reducing RTA.
+	return totalInflows - totalAllocations, nil
 }
 
 // GetReadyToAssign reads the Ready to Assign amount from the database
