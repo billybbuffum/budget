@@ -11,9 +11,9 @@ const (
 	CategoryTypeExpense CategoryType = "expense"
 )
 
-// Category represents a budget category for expense tracking and budgeting
+// Category represents a budget category for spending tracking and budgeting
 // All categories can receive budget allocations
-// Income transactions don't require a category - they just increase Ready to Assign
+// Inflow transactions don't require a category - they just increase Ready to Assign
 // Payment categories are automatically created for credit card accounts
 type Category struct {
 	ID                  string    `json:"id"`

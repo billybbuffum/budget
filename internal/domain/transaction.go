@@ -6,14 +6,14 @@ import "time"
 type TransactionType string
 
 const (
-	TransactionTypeNormal   TransactionType = "normal"   // Regular income or expense
+	TransactionTypeNormal   TransactionType = "normal"   // Regular inflow or outflow
 	TransactionTypeTransfer TransactionType = "transfer" // Transfer between accounts
 )
 
 // Transaction represents a single financial transaction
 // Normal transactions:
-//   - Positive amounts = Inflows (income) - CategoryID optional
-//   - Negative amounts = Outflows (expenses) - CategoryID required
+//   - Positive amounts = Inflows - CategoryID optional
+//   - Negative amounts = Outflows - CategoryID required
 // Transfer transactions:
 //   - Move money between accounts
 //   - No category needed

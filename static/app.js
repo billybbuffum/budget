@@ -1009,9 +1009,12 @@ async function loadUncategorizedTransactions() {
     try {
         const transactions = await apiCall('/transactions?uncategorized=true');
 
+        // Filter to only show outflows (negative amounts) - inflows don't need categorization
+        const outflows = transactions.filter(txn => txn.amount < 0);
+
         const listContainer = document.getElementById('uncategorized-list');
 
-        if (transactions.length === 0) {
+        if (outflows.length === 0) {
             listContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">No uncategorized transactions</p>';
             return;
         }
@@ -1021,7 +1024,7 @@ async function loadUncategorizedTransactions() {
                 <button onclick="selectAllUncategorized()" class="btn-secondary text-sm">Select All</button>
                 <button onclick="showCategorizeModal()" class="btn-primary text-sm">Categorize Selected</button>
             </div>
-            ${transactions.map(txn => {
+            ${outflows.map(txn => {
                 const account = accounts.find(a => a.id === txn.account_id);
                 const amountClass = txn.amount >= 0 ? 'text-green-600' : 'text-red-600';
                 return `
@@ -1089,17 +1092,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme
     initializeTheme();
 
-    // Add listener for transaction type change to update category requirement
-    document.getElementById('transaction-type').addEventListener('change', function() {
+    // Add listener for amount change to update category requirement
+    document.getElementById('transaction-amount').addEventListener('input', function() {
         const categorySelect = document.getElementById('transaction-category');
         const categoryIndicator = document.getElementById('category-required-indicator');
+        const amount = parseFloat(this.value);
 
-        if (this.value === 'inflow') {
-            // Income: category is optional
+        if (amount > 0 || isNaN(amount)) {
+            // Inflow or empty: category is optional
             categorySelect.removeAttribute('required');
             categoryIndicator.textContent = '';
         } else {
-            // Expense: category is required
+            // Outflow (negative): category is required
             categorySelect.setAttribute('required', 'required');
             categoryIndicator.textContent = '*';
         }
@@ -1129,7 +1133,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const accountId = document.getElementById('transaction-account').value;
         const categoryId = document.getElementById('transaction-category').value;
         const amount = parseFloat(document.getElementById('transaction-amount').value);
-        const type = document.getElementById('transaction-type').value;
         const date = document.getElementById('transaction-date').value;
         const description = document.getElementById('transaction-description').value;
 
@@ -1138,14 +1141,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Category is required for outflow but optional for inflow
-        if (type === 'outflow' && !categoryId) {
-            showToast('Please select a category for expenses', 'error');
+        // Category is required for outflows (negative amounts) but optional for inflows
+        if (amount < 0 && !categoryId) {
+            showToast('Please select a category for outflows', 'error');
             return;
         }
 
-        // Convert amount to cents, negative for outflow
-        const amountInCents = Math.round((type === 'outflow' ? -amount : amount) * 100);
+        // Convert amount to cents
+        const amountInCents = Math.round(amount * 100);
 
         try {
             await apiCall('/transactions', {
