@@ -141,7 +141,7 @@ async function loadReadyToAssign() {
 
 async function loadAllocationSummary() {
     const period = getCurrentPeriod();
-    return await apiCall(`/allocations/summary?period=${period}`) || [];
+    return await apiCall(`/allocations/summary?period=${period}`) || { ready_to_assign: 0, categories: [] };
 }
 
 async function loadAccountSummary() {
@@ -182,9 +182,6 @@ function showView(viewName) {
             break;
         case 'import':
             loadImportView();
-            break;
-        case 'categories':
-            loadCategoriesView();
             break;
     }
 }
@@ -258,14 +255,30 @@ function renderGroupSection(group, groupCategories, summary) {
 
     return `
         <div class="budget-group mb-4" data-group-id="${group.id}">
-            <div class="flex items-center gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-600 transition">
-                <span class="drag-handle text-gray-400 dark:text-gray-500">⋮⋮</span>
-                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">${group.name}</h3>
-                <button onclick="deleteGroup('${group.id}')" class="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">Delete</button>
+            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
+                <div class="flex items-center gap-3 flex-1">
+                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
+                        <span class="cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 rounded px-2 py-1 -mx-2 -my-1 inline-block no-drag"
+                              onclick="event.stopPropagation(); startGroupNameEdit('${group.id}', '${group.name.replace(/'/g, "\\'")}')"
+                              title="Click to edit group name">${group.name}</span>
+                    </h3>
+                </div>
+                <div class="flex gap-6 items-center">
+                    <!-- Invisible spacers to align with category columns -->
+                    <div class="w-24"></div>
+                    <div class="w-24"></div>
+                    <div class="w-24"></div>
+                    <button onclick="event.stopPropagation(); deleteGroup('${group.id}');"
+                            class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
+                            style="font-size: 12px;"
+                            title="Delete group">✕</button>
+                </div>
             </div>
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
+            <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -281,6 +294,7 @@ function renderUngroupedSection(ungroupedCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
                 ${categoriesHtml}
             </div>
+            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -308,30 +322,43 @@ function renderBudgetCategory(category, summary) {
             <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
         </div>` : '';
 
+    const deleteButton = isPaymentCategory
+        ? '<div class="ml-3 w-5 h-5"></div>' // Spacer to maintain alignment
+        : `<button onclick="event.stopPropagation(); deleteCategory('${category.id}', '${category.name.replace(/'/g, "\\'")}');"
+                   class="ml-3 w-5 h-5 flex items-center justify-center text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded no-drag transition-colors"
+                   style="font-size: 12px;"
+                   title="Delete category">✕</button>`;
+
     return `
-        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
+        <div class="budget-category group border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-white dark:bg-gray-800'} cursor-move"
              data-category-id="${category.id}">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
-                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
+                    <div class="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 dark:hover:ring-blue-600 no-drag"
+                         style="background-color: ${category.color || '#3b82f6'}"
+                         onclick="event.stopPropagation(); showColorPicker('${category.id}', '${category.color || '#3b82f6'}');"
+                         title="Click to change color"></div>
                     <div class="flex-1">
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                        <div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 py-1 -mx-2 -my-1 no-drag inline-block"
+                             onclick="event.stopPropagation(); startCategoryNameEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}')"
+                             title="Click to edit name">${category.name}</div>
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
-                    <div class="text-right">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
-                    <div class="text-right">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
-                    <div class="text-right min-w-[100px]">
+                    <div class="text-right w-24">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
                         <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
                     </div>
+                    ${deleteButton}
                 </div>
             </div>
             ${underfundedWarning}
@@ -543,75 +570,6 @@ async function loadTransactionsView() {
     }
 }
 
-// Categories view
-async function loadCategoriesView() {
-    try {
-        await loadCategories();
-
-        // Filter out payment categories (auto-created for credit cards)
-        const userCategories = categories.filter(c => !c.payment_for_account_id);
-        const categoriesList = document.getElementById('categories-list');
-
-        if (userCategories.length === 0) {
-            categoriesList.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No categories yet.</div>';
-        } else {
-            // Show flat list of categories (groups are managed on budget page)
-            categoriesList.innerHTML = userCategories.map(category => renderCategoryCard(category)).join('');
-        }
-    } catch (error) {
-        console.error('Failed to load categories view:', error);
-    }
-}
-
-function renderCategoriesByGroups(categoriesList, groups) {
-    let html = '';
-
-    // Render groups with their categories
-    for (const group of groups) {
-        const groupCategories = categoriesList.filter(c => c.group_id === group.id);
-        if (groupCategories.length > 0) {
-            html += `
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-3">${group.name}</h3>
-                    ${group.description ? `<p class="text-sm text-gray-500 mb-3">${group.description}</p>` : ''}
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${groupCategories.map(category => renderCategoryCard(category)).join('')}
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    // Render ungrouped categories
-    const ungroupedCategories = categoriesList.filter(c => !c.group_id);
-    if (ungroupedCategories.length > 0) {
-        html += `
-            <div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-700 mb-3">Ungrouped</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    ${ungroupedCategories.map(category => renderCategoryCard(category)).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    return html || '<div class="text-gray-500 text-center py-4">No categories yet.</div>';
-}
-
-function renderCategoryCard(category) {
-    return `
-        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div class="flex items-center gap-3">
-                <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
-                <div class="flex-1">
-                    <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
-                    ${category.description ? `<div class="text-sm text-gray-500 dark:text-gray-400">${category.description}</div>` : ''}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
 // Month navigation
 function changeMonth(delta) {
     currentMonth.setMonth(currentMonth.getMonth() + delta);
@@ -688,23 +646,6 @@ async function showAddTransferModal() {
 function showAddAccountModal() {
     document.getElementById('account-form').reset();
     showModal('account-modal');
-}
-
-function showAddCategoryModal() {
-    document.getElementById('category-form').reset();
-
-    // Reset color swatches to default (blue)
-    document.querySelectorAll('.color-swatch').forEach(swatch => {
-        swatch.classList.remove('selected');
-        swatch.querySelector('.color-check').classList.add('hidden');
-    });
-    const defaultSwatch = document.querySelector('.color-swatch[data-color="#3b82f6"]');
-    if (defaultSwatch) {
-        defaultSwatch.classList.add('selected');
-        defaultSwatch.querySelector('.color-check').classList.remove('hidden');
-    }
-    document.getElementById('category-color').value = '#3b82f6';
-    showModal('category-modal');
 }
 
 function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
@@ -795,6 +736,359 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     input.addEventListener('blur', () => {
         setTimeout(() => saveAllocation(), 100);
     });
+}
+
+// Inline category name editing
+async function startCategoryNameEdit(categoryId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Category name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/categories/${categoryId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        color: '', // Will be preserved by backend
+                        description: ''
+                    })
+                });
+
+                showToast('Category name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update category name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+// Delete category with confirmation
+async function deleteCategory(categoryId, categoryName) {
+    if (!confirm(`Delete category "${categoryName}"?\n\nThis will remove the category and unassign it from all transactions.`)) {
+        return;
+    }
+
+    try {
+        await apiCall(`/categories/${categoryId}`, { method: 'DELETE' });
+        showToast('Category deleted!');
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to delete category:', error);
+    }
+}
+
+// Show color picker for category
+function showColorPicker(categoryId, currentColor) {
+    const colors = [
+        { hex: '#f97316', name: 'Orange' },
+        { hex: '#3b82f6', name: 'Blue' },
+        { hex: '#10b981', name: 'Green' },
+        { hex: '#a855f7', name: 'Purple' },
+        { hex: '#ef4444', name: 'Red' },
+        { hex: '#ec4899', name: 'Pink' },
+        { hex: '#eab308', name: 'Yellow' },
+        { hex: '#6366f1', name: 'Indigo' },
+        { hex: '#14b8a6', name: 'Teal' },
+        { hex: '#6b7280', name: 'Gray' }
+    ];
+
+    const colorButtons = colors.map(color =>
+        `<button onclick="updateCategoryColor('${categoryId}', '${color.hex}');"
+                 class="w-8 h-8 rounded-full hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition ${color.hex === currentColor ? 'ring-2 ring-blue-600' : ''}"
+                 style="background-color: ${color.hex}"
+                 title="${color.name}"></button>`
+    ).join('');
+
+    const picker = document.createElement('div');
+    picker.id = 'color-picker-popup';
+    picker.className = 'fixed bg-white border-2 border-gray-300 rounded-lg shadow-xl p-4 z-50';
+    picker.style.left = event.pageX + 'px';
+    picker.style.top = event.pageY + 'px';
+    picker.innerHTML = `
+        <div class="mb-2 text-sm font-semibold text-gray-700">Select Color</div>
+        <div class="grid grid-cols-5 gap-2 mb-2">
+            ${colorButtons}
+        </div>
+        <button onclick="closeColorPicker()" class="text-xs text-gray-600 hover:text-gray-800 w-full">Cancel</button>
+    `;
+
+    // Remove any existing picker
+    const existing = document.getElementById('color-picker-popup');
+    if (existing) existing.remove();
+
+    document.body.appendChild(picker);
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeOnClickOutside(e) {
+            if (!picker.contains(e.target)) {
+                closeColorPicker();
+                document.removeEventListener('click', closeOnClickOutside);
+            }
+        });
+    }, 100);
+}
+
+function closeColorPicker() {
+    const picker = document.getElementById('color-picker-popup');
+    if (picker) picker.remove();
+}
+
+async function updateCategoryColor(categoryId, newColor) {
+    closeColorPicker();
+
+    try {
+        await apiCall(`/categories/${categoryId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: '', // Will be preserved by backend
+                color: newColor,
+                description: ''
+            })
+        });
+
+        showToast('Color updated!');
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to update category color:', error);
+    }
+}
+
+// Inline group name editing
+async function startGroupNameEdit(groupId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-lg font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Group name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/category-groups/${groupId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        description: '',
+                        display_order: 0 // Will be preserved by backend
+                    })
+                });
+
+                showToast('Group name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update group name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+// Show inline form to add category
+function showAddCategoryInline(groupId) {
+    const colors = [
+        { hex: '#f97316', name: 'Orange' },
+        { hex: '#3b82f6', name: 'Blue' },
+        { hex: '#10b981', name: 'Green' },
+        { hex: '#a855f7', name: 'Purple' },
+        { hex: '#ef4444', name: 'Red' },
+        { hex: '#ec4899', name: 'Pink' },
+        { hex: '#eab308', name: 'Yellow' },
+        { hex: '#6366f1', name: 'Indigo' },
+        { hex: '#14b8a6', name: 'Teal' },
+        { hex: '#6b7280', name: 'Gray' }
+    ];
+
+    const colorButtons = colors.map(color =>
+        `<button type="button" onclick="selectInlineColor('${color.hex}')"
+                 class="inline-color-btn w-6 h-6 rounded-full hover:ring-2 hover:ring-blue-400 transition"
+                 style="background-color: ${color.hex}"
+                 data-color="${color.hex}"
+                 title="${color.name}"></button>`
+    ).join('');
+
+    const groupSelector = groupId
+        ? `<input type="hidden" id="inline-category-group" value="${groupId}">`
+        : `<input type="hidden" id="inline-category-group" value="">`;
+
+    const formHtml = `
+        <div id="inline-category-form" class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mt-2">
+            <h4 class="font-semibold mb-3">Add New Category</h4>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Name *</label>
+                    <input type="text" id="inline-category-name" class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Category name" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Color</label>
+                    <div class="flex gap-2 flex-wrap">
+                        ${colorButtons}
+                    </div>
+                    <input type="hidden" id="inline-category-color" value="#3b82f6">
+                </div>
+                ${groupSelector}
+                <div class="flex gap-2">
+                    <button type="button" onclick="saveInlineCategory()" class="btn-primary text-sm">Add Category</button>
+                    <button type="button" onclick="cancelInlineCategory()" class="btn-secondary text-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove any existing form
+    const existing = document.getElementById('inline-category-form');
+    if (existing) existing.remove();
+
+    // Find the right place to insert the form
+    const targetButton = event.target;
+    targetButton.insertAdjacentHTML('beforebegin', formHtml);
+
+    // Focus on name input
+    document.getElementById('inline-category-name').focus();
+
+    // Highlight default color
+    selectInlineColor('#3b82f6');
+}
+
+function selectInlineColor(color) {
+    // Remove selection from all buttons
+    document.querySelectorAll('.inline-color-btn').forEach(btn => {
+        btn.classList.remove('ring-2', 'ring-blue-600');
+    });
+
+    // Add selection to clicked button
+    const selectedBtn = document.querySelector(`.inline-color-btn[data-color="${color}"]`);
+    if (selectedBtn) {
+        selectedBtn.classList.add('ring-2', 'ring-blue-600');
+    }
+
+    // Update hidden input
+    const colorInput = document.getElementById('inline-category-color');
+    if (colorInput) {
+        colorInput.value = color;
+    }
+}
+
+async function saveInlineCategory() {
+    const name = document.getElementById('inline-category-name').value.trim();
+    const color = document.getElementById('inline-category-color').value;
+    const groupId = document.getElementById('inline-category-group').value;
+
+    if (!name) {
+        showToast('Please enter a category name', 'error');
+        return;
+    }
+
+    try {
+        const categoryData = {
+            name,
+            color,
+            description: ''
+        };
+
+        const newCategory = await apiCall('/categories', {
+            method: 'POST',
+            body: JSON.stringify(categoryData)
+        });
+
+        // If group is specified, assign category to group
+        if (groupId && newCategory.id) {
+            await apiCall('/category-groups/assign', {
+                method: 'POST',
+                body: JSON.stringify({
+                    category_id: newCategory.id,
+                    group_id: groupId
+                })
+            });
+        }
+
+        showToast('Category added!');
+        cancelInlineCategory();
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to add category:', error);
+    }
+}
+
+function cancelInlineCategory() {
+    const form = document.getElementById('inline-category-form');
+    if (form) form.remove();
 }
 
 // Load uncategorized transactions
@@ -1040,37 +1334,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadAccountsView();
         } catch (error) {
             console.error('Failed to create account:', error);
-        }
-    });
-
-    // Category form
-    document.getElementById('category-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const name = document.getElementById('category-name').value;
-        const color = document.getElementById('category-color').value;
-        const description = document.getElementById('category-description').value;
-
-        try {
-            await apiCall('/categories', {
-                method: 'POST',
-                body: JSON.stringify({
-                    name,
-                    color,
-                    description
-                })
-            });
-
-            closeModal('category-modal');
-            document.getElementById('category-form').reset();
-            showToast('Category created successfully!');
-
-            // Reload categories
-            await loadCategories();
-            loadCategoriesView();
-            loadBudgetView();
-        } catch (error) {
-            console.error('Failed to create category:', error);
         }
     });
 
