@@ -282,9 +282,10 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 
 		var totalSpent int64
 		for _, txn := range allTransactions {
-			// Only count actual spending, not transfers
-			// Transfers just move money between accounts and are already reflected in balances
-			if txn.Amount < 0 && txn.Type != "transfer" {
+			// For category-specific available: COUNT all spending including transfers
+			// Transfers DO reduce what's available in a specific category
+			// (This is different from Ready to Assign, which excludes transfers)
+			if txn.Amount < 0 {
 				totalSpent += -txn.Amount // Convert to positive for display
 			}
 		}
