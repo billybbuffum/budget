@@ -126,16 +126,14 @@ func (s *CategoryGroupService) AssignCategoryToGroup(ctx context.Context, catego
 		return fmt.Errorf("category not found: %w", err)
 	}
 
-	// Get the group
-	group, err := s.categoryGroupRepo.GetByID(ctx, groupID)
+	// Verify the group exists
+	_, err = s.categoryGroupRepo.GetByID(ctx, groupID)
 	if err != nil {
 		return fmt.Errorf("category group not found: %w", err)
 	}
 
-	// Validate that category and group types match
-	if category.Type != group.Type {
-		return fmt.Errorf("category type (%s) does not match group type (%s)", category.Type, group.Type)
-	}
+	// Note: We no longer validate category-group type matching since categories don't have types
+	// All categories are budget categories (expenses), while groups can be income or expense
 
 	// Assign the category to the group
 	category.GroupID = &groupID
