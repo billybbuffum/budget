@@ -29,6 +29,12 @@ var migrations = []Migration{
 		Up:          migrateAddFitID,
 		Down:        rollbackAddFitID,
 	},
+	{
+		Version:     "003_deprecate_ready_to_assign",
+		Description: "Deprecate ready_to_assign field - now calculated per period instead of global singleton",
+		Up:          migrateDeprecateReadyToAssign,
+		Down:        rollbackDeprecateReadyToAssign,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -314,6 +320,37 @@ func rollbackAddFitID(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// migrateDeprecateReadyToAssign sets ready_to_assign to 0 as it's now calculated per-period
+func migrateDeprecateReadyToAssign(db *sql.DB) error {
+	// Just reset the value to 0 - the field will remain for backward compatibility
+	// but won't be used. Ready to Assign is now calculated per period.
+	_, err := db.Exec(`
+		UPDATE budget_state
+		SET ready_to_assign = 0, updated_at = datetime('now')
+		WHERE id = 'singleton'
+	`)
+	return err
+}
+
+// rollbackDeprecateReadyToAssign would need to recalculate ready_to_assign from data
+func rollbackDeprecateReadyToAssign(db *sql.DB) error {
+	// Recalculate ready_to_assign as: Total Account Balance - Total Allocated + Total Spent
+	_, err := db.Exec(`
+		UPDATE budget_state
+		SET ready_to_assign = (
+			SELECT COALESCE(SUM(balance), 0) FROM accounts
+		) - (
+			SELECT COALESCE(
+				(SELECT COALESCE(SUM(amount), 0) FROM allocations) -
+				(SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE amount < 0),
+			0)
+		),
+		updated_at = datetime('now')
+		WHERE id = 'singleton'
+	`)
+	return err
 }
 
 // initMigrationTable creates the schema_migrations table if it doesn't exist
