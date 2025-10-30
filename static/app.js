@@ -232,12 +232,14 @@ function renderBudgetWithGroups(summary) {
 }
 
 function renderGroupSection(group, groupCategories, summary) {
-    const categoriesHtml = groupCategories.length > 0
-        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>';
-
     // Check if this is the Credit Card Payments group (protected from user modifications)
     const isCreditCardPaymentsGroup = group.name === 'Credit Card Payments';
+
+    const categoriesHtml = groupCategories.length > 0
+        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : (isCreditCardPaymentsGroup
+            ? '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Payment categories are automatically created for credit card accounts</div>'
+            : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>');
 
     // Conditionally render edit functionality and delete button
     const groupNameHtml = isCreditCardPaymentsGroup
@@ -253,8 +255,13 @@ function renderGroupSection(group, groupCategories, summary) {
                    style="font-size: 12px;"
                    title="Delete group">✕</button>`;
 
+    // Only show "+ Add Category" button for non-Credit Card Payments groups
+    const addCategoryButton = isCreditCardPaymentsGroup
+        ? ''
+        : `<button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>`;
+
     return `
-        <div class="budget-group mb-4" data-group-id="${group.id}">
+        <div class="budget-group mb-4" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
             <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
                 <div class="flex items-center gap-3 flex-1">
                     <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
@@ -273,7 +280,7 @@ function renderGroupSection(group, groupCategories, summary) {
             <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
                 ${categoriesHtml}
             </div>
-            <button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
+            ${addCategoryButton}
         </div>
     `;
 }
@@ -305,6 +312,21 @@ function renderBudgetCategory(category, summary) {
 
     const isPaymentCategory = category.payment_for_account_id != null;
     const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
+
+    // For payment categories, get the credit card account balance
+    let cardBalanceDisplay = '';
+    if (isPaymentCategory) {
+        const creditCardAccount = accounts.find(acc => acc.id === category.payment_for_account_id);
+        if (creditCardAccount) {
+            const cardBalance = Math.abs(creditCardAccount.balance);
+            const balanceClass = creditCardAccount.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+            cardBalanceDisplay = `
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Card Balance</div>
+                    <div class="font-semibold ${balanceClass}">${formatCurrency(cardBalance)}</div>
+                </div>`;
+        }
+    }
 
     const allocatedDisplay = isPaymentCategory
         ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
@@ -338,12 +360,13 @@ function renderBudgetCategory(category, summary) {
                     </div>
                 </div>
                 <div class="flex gap-6 items-center">
+                    ${cardBalanceDisplay}
                     <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
                     <div class="text-right">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${isPaymentCategory ? 'Paid' : 'Spent'}</div>
                         <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
                     <div class="text-right min-w-[100px]">
@@ -388,6 +411,15 @@ function initializeBudgetDragDrop() {
                     if (isPaymentCategory && currentGroupId !== targetGroupId) {
                         // Show a brief toast message
                         showToast('Credit card payment categories cannot be moved to other groups', 'error');
+                        return false; // Prevent the move
+                    }
+
+                    // Prevent moving ANY categories into the Credit Card Payments group
+                    const targetGroup = evt.to.closest('.budget-group');
+                    const isTargetAutoManaged = targetGroup && targetGroup.dataset.autoManaged === 'true';
+
+                    if (isTargetAutoManaged && currentGroupId !== targetGroupId) {
+                        showToast('Cannot add categories to the Credit Card Payments group - it is auto-managed', 'error');
                         return false; // Prevent the move
                     }
 
@@ -667,7 +699,17 @@ async function loadAccountsView() {
         }
 
         accountsList.innerHTML = accounts.map(account => {
+            const isCreditCard = account.type === 'credit';
             const balanceClass = account.balance >= 0 ? 'text-green-600' : 'text-red-600';
+
+            // For credit cards, show "Owe $X.XX" instead of negative amount
+            let balanceDisplay;
+            if (isCreditCard && account.balance < 0) {
+                balanceDisplay = `<span class="text-sm text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+            } else {
+                balanceDisplay = formatCurrency(account.balance);
+            }
+
             return `
                 <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
@@ -676,7 +718,7 @@ async function loadAccountsView() {
                             <div class="text-sm text-gray-500 dark:text-gray-400 capitalize">${account.type}</div>
                         </div>
                         <div class="text-right">
-                            <div class="text-xl font-bold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                            <div class="text-xl font-bold ${balanceClass}">${balanceDisplay}</div>
                         </div>
                     </div>
                 </div>
@@ -865,6 +907,15 @@ async function showAddTransactionModal() {
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('transaction-date').value = today;
+
+    // Reset amount label and hint to defaults
+    const amountLabel = document.getElementById('amount-label');
+    const amountHint = document.getElementById('amount-hint');
+    const amountInput = document.getElementById('transaction-amount');
+    amountLabel.textContent = 'Amount *';
+    amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+    amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+    amountInput.removeAttribute('min');
 
     showModal('transaction-modal');
 }
@@ -1092,6 +1143,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme
     initializeTheme();
 
+    // Add listener for account change to update amount hint text
+    document.getElementById('transaction-account').addEventListener('change', function() {
+        const amountLabel = document.getElementById('amount-label');
+        const amountHint = document.getElementById('amount-hint');
+        const amountInput = document.getElementById('transaction-amount');
+        const selectedAccountId = this.value;
+
+        if (!selectedAccountId) {
+            amountLabel.textContent = 'Amount *';
+            amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+            amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+            return;
+        }
+
+        const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
+        if (selectedAccount && selectedAccount.type === 'credit') {
+            amountLabel.textContent = 'How much did you spend? *';
+            amountHint.textContent = 'Enter amount spent (we\'ll deduct it automatically). To make a payment, use the Transfer button.';
+            amountInput.placeholder = '45.67';
+            amountInput.min = '0.01'; // Only allow positive amounts for spending
+        } else {
+            amountLabel.textContent = 'Amount *';
+            amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+            amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+            amountInput.removeAttribute('min'); // Allow negative amounts for regular accounts
+        }
+    });
+
     // Add listener for amount change to update category requirement
     document.getElementById('transaction-amount').addEventListener('input', function() {
         const categorySelect = document.getElementById('transaction-category');
@@ -1132,13 +1212,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const accountId = document.getElementById('transaction-account').value;
         const categoryId = document.getElementById('transaction-category').value;
-        const amount = parseFloat(document.getElementById('transaction-amount').value);
+        let amount = parseFloat(document.getElementById('transaction-amount').value);
         const date = document.getElementById('transaction-date').value;
         const description = document.getElementById('transaction-description').value;
 
         if (!accountId) {
             showToast('Please select an account', 'error');
             return;
+        }
+
+        // For credit card accounts, auto-negate positive amounts (spending)
+        // Payments to credit cards should be done via transfers, not this form
+        const selectedAccount = accounts.find(a => a.id === accountId);
+        if (selectedAccount && selectedAccount.type === 'credit') {
+            if (amount < 0) {
+                showToast('To make a credit card payment, use the Transfer button instead', 'error');
+                return;
+            }
+            // Auto-negate for spending
+            amount = -amount;
         }
 
         // Category is required for outflows (negative amounts) but optional for inflows
@@ -1428,14 +1520,24 @@ async function renderAccountsSidebar() {
     `;
 
     accounts.forEach(account => {
+        const isCreditCard = account.type === 'credit';
         const balanceClass = account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+
+        // For credit cards, show "Owe $X.XX" instead of negative amount
+        let balanceDisplay;
+        if (isCreditCard && account.balance < 0) {
+            balanceDisplay = `<span class="text-xs text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+        } else {
+            balanceDisplay = formatCurrency(account.balance);
+        }
+
         html += `
             <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="loadAccountTransactionsPanel('${account.id}')">
                 <div class="flex justify-between items-start">
                     <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">${account.name}</div>
                     <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${account.type}</span>
                 </div>
-                <div class="text-sm font-semibold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                <div class="text-sm font-semibold ${balanceClass}">${balanceDisplay}</div>
             </div>
         `;
     });

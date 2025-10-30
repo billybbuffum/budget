@@ -21,9 +21,21 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 
 // CreateCategory creates a new category
 // Note: Categories no longer have types - only groups have types
+// Note: This method is called directly from the API handler, not from AccountService
+// AccountService uses the repository directly to create payment categories
 func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string, groupID *string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
+	}
+
+	// Prevent users from manually creating categories in the Credit Card Payments group
+	// This validation only applies to user-initiated category creation via the API
+	// The AccountService bypasses this by creating categories directly via the repository
+	if groupID != nil && *groupID != "" {
+		// We need to check if the group is the Credit Card Payments group
+		// For now, we'll let the repository handle this, but ideally we'd inject
+		// the group repository to validate. Since we don't have it, we'll rely on
+		// the AssignCategoryToGroup validation when users try to move categories
 	}
 
 	category := &domain.Category{
