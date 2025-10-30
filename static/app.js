@@ -158,8 +158,11 @@ async function loadBudgetView() {
     try {
         await loadCategories();
         await loadAllocations();
-        const readyToAssign = await loadReadyToAssign();
-        const summary = await loadAllocationSummary();
+        const summaryData = await loadAllocationSummary();
+
+        // Extract ready_to_assign and categories from the response
+        const readyToAssign = summaryData?.ready_to_assign || 0;
+        const summary = summaryData?.categories || [];
 
         document.getElementById('ready-to-assign').textContent = formatCurrency(readyToAssign);
 
