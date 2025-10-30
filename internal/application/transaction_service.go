@@ -239,13 +239,43 @@ func (s *TransactionService) CreateTransfer(ctx context.Context, fromAccountID, 
 		return nil, fmt.Errorf("destination account not found: %w", err)
 	}
 
-	// If transferring TO a credit card, categorize the outbound transaction with payment category
-	// This shows the payment as "spending" from the payment category budget
+	// If transferring TO a credit card, check if we should categorize with payment category
+	// Only categorize if there's money allocated (don't categorize overpayments)
 	var outboundCategoryID *string
 	if toAccount.Type == domain.AccountTypeCredit {
 		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, toAccountID)
 		if err == nil && paymentCategory != nil {
-			outboundCategoryID = &paymentCategory.ID
+			// Check if payment category has any allocation
+			// Get all allocations for this payment category
+			allAllocations, err := s.allocationRepo.List(ctx)
+			if err == nil {
+				var totalAllocated int64
+				for _, alloc := range allAllocations {
+					if alloc.CategoryID == paymentCategory.ID {
+						totalAllocated += alloc.Amount
+					}
+				}
+
+				// Get all transactions already categorized with this payment category
+				allTransactions, err := s.transactionRepo.ListByCategory(ctx, paymentCategory.ID)
+				if err == nil {
+					var totalSpent int64
+					for _, txn := range allTransactions {
+						if txn.Amount < 0 {
+							totalSpent += -txn.Amount // Convert to positive
+						}
+					}
+
+					// Available = Allocated - Already Spent
+					available := totalAllocated - totalSpent
+
+					// Only categorize if payment <= available
+					// This prevents showing negative available when overpaying
+					if available >= amount {
+						outboundCategoryID = &paymentCategory.ID
+					}
+				}
+			}
 		}
 	}
 
@@ -255,7 +285,7 @@ func (s *TransactionService) CreateTransfer(ctx context.Context, fromAccountID, 
 		Type:                domain.TransactionTypeTransfer,
 		AccountID:           fromAccountID,
 		TransferToAccountID: &toAccountID,
-		CategoryID:          outboundCategoryID, // Categorize with payment category if paying credit card
+		CategoryID:          outboundCategoryID, // Categorize with payment category if allocated funds available
 		Amount:              -amount, // Negative for outbound
 		Description:         description,
 		Date:                date,
