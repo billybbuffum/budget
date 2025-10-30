@@ -20,10 +20,17 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) *CategoryService
 }
 
 // CreateCategory creates a new category
-// Note: Categories no longer have types - only groups have types
+// Note: groupID is required - all categories must belong to a group
+// Note: This method is called directly from the API handler for user-created categories
+// AccountService uses the repository directly to create payment categories
 func (s *CategoryService) CreateCategory(ctx context.Context, name, description, color string, groupID *string) (*domain.Category, error) {
 	if name == "" {
 		return nil, fmt.Errorf("category name is required")
+	}
+
+	// Require group_id for all user-created categories
+	if groupID == nil || *groupID == "" {
+		return nil, fmt.Errorf("group_id is required - all categories must belong to a group")
 	}
 
 	category := &domain.Category{
@@ -69,8 +76,11 @@ func (s *CategoryService) UpdateCategory(ctx context.Context, id, name, descript
 	if color != "" {
 		category.Color = color
 	}
-	// Allow explicit setting/unsetting of group_id
+	// Update group_id if provided, but ensure it's not nil
 	if groupID != nil {
+		if *groupID == "" {
+			return nil, fmt.Errorf("group_id cannot be empty - all categories must belong to a group")
+		}
 		category.GroupID = groupID
 	}
 	category.UpdatedAt = time.Now()

@@ -5,6 +5,7 @@ let categories = [];
 let categoryGroups = [];
 let transactions = [];
 let allocations = [];
+let collapsedGroups = new Set(); // Track which groups are collapsed
 
 // Theme management
 function initializeTheme() {
@@ -202,11 +203,14 @@ async function loadBudgetView() {
             return;
         }
 
-        // Render groups and ungrouped categories
+        // Render category groups
         budgetCategories.innerHTML = renderBudgetWithGroups(summary);
 
         // Initialize drag-and-drop after rendering
         initializeBudgetDragDrop();
+
+        // Update expand/collapse all button text
+        updateExpandCollapseButton();
     } catch (error) {
         console.error('Failed to load budget view:', error);
     }
@@ -218,26 +222,37 @@ function renderBudgetWithGroups(summary) {
     // Sort groups by display order
     const sortedGroups = [...categoryGroups].sort((a, b) => a.display_order - b.display_order);
 
+    // Initialize collapsed state: collapse all groups by default on first load
+    // Only initialize if we haven't set any state yet (use a flag to track first load)
+    if (typeof window.budgetGroupsInitialized === 'undefined') {
+        window.budgetGroupsInitialized = true;
+        collapsedGroups.clear();
+        sortedGroups.forEach(group => collapsedGroups.add(group.id));
+    }
+
     // Render each group (including empty ones)
     for (const group of sortedGroups) {
         const groupCategories = categories.filter(c => c.group_id === group.id);
         html += renderGroupSection(group, groupCategories, summary);
     }
 
-    // Always render ungrouped section
-    const ungroupedCategories = categories.filter(c => !c.group_id);
-    html += renderUngroupedSection(ungroupedCategories, summary);
-
     return html;
 }
 
 function renderGroupSection(group, groupCategories, summary) {
-    const categoriesHtml = groupCategories.length > 0
-        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>';
+    // Collapsible groups feature
+    const isCollapsed = collapsedGroups.has(group.id);
+    const chevron = isCollapsed ? '▶' : '▼';
+    const contentDisplay = isCollapsed ? 'style="display: none;"' : '';
 
     // Check if this is the Credit Card Payments group (protected from user modifications)
     const isCreditCardPaymentsGroup = group.name === 'Credit Card Payments';
+
+    const categoriesHtml = groupCategories.length > 0
+        ? groupCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
+        : (isCreditCardPaymentsGroup
+            ? '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Payment categories are automatically created for credit card accounts</div>'
+            : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here</div>');
 
     // Conditionally render edit functionality and delete button
     const groupNameHtml = isCreditCardPaymentsGroup
@@ -253,43 +268,36 @@ function renderGroupSection(group, groupCategories, summary) {
                    style="font-size: 12px;"
                    title="Delete group">✕</button>`;
 
+    // Only show "+ Add Category" button for non-Credit Card Payments groups
+    const addCategoryButton = isCreditCardPaymentsGroup
+        ? ''
+        : `<button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>`;
+
     return `
-        <div class="budget-group mb-4" data-group-id="${group.id}">
-            <div class="flex justify-between items-center mb-2 mx-px p-4 bg-gray-100 dark:bg-gray-700 rounded transition">
-                <div class="flex items-center gap-3 flex-1">
-                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition" title="Drag to reorder">⋮⋮</span>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 flex-1">
+        <div class="budget-group mb-2" data-group-id="${group.id}" ${isCreditCardPaymentsGroup ? 'data-auto-managed="true"' : ''}>
+            <div class="flex justify-between items-center mb-1 mx-px p-2 bg-gray-100 dark:bg-gray-700 rounded transition cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"
+                 onclick="toggleGroupCollapse('${group.id}')">
+                <div class="flex items-center gap-2 flex-1">
+                    <span class="collapse-icon text-gray-600 dark:text-gray-400 select-none" style="font-size: 10px; width: 12px;">${chevron}</span>
+                    <span class="drag-handle text-gray-400 dark:text-gray-500 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition no-drag text-xs" title="Drag to reorder" onclick="event.stopPropagation()">⋮⋮</span>
+                    <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 flex-1">
                         ${groupNameHtml}
                     </h3>
                 </div>
-                <div class="flex gap-6 items-center">
+                <div class="flex gap-4 items-center">
                     <!-- Invisible spacers to align with category columns -->
-                    <div class="w-24"></div>
-                    <div class="w-24"></div>
-                    <div class="w-24"></div>
+                    <div class="w-20"></div>
+                    <div class="w-20"></div>
+                    <div class="w-20"></div>
                     ${deleteButtonHtml}
                 </div>
             </div>
-            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="${group.id}">
-                ${categoriesHtml}
+            <div class="group-content" ${contentDisplay}>
+                <div class="group-categories space-y-1 min-h-[40px]" data-group-id="${group.id}">
+                    ${categoriesHtml}
+                </div>
+                ${addCategoryButton}
             </div>
-            <button onclick="showAddCategoryInline('${group.id}', event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
-        </div>
-    `;
-}
-
-function renderUngroupedSection(ungroupedCategories, summary) {
-    const categoriesHtml = ungroupedCategories.length > 0
-        ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here to ungroup</div>';
-
-    return `
-        <div class="budget-group mb-4" data-group-id="ungrouped">
-            <h3 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2 p-2">Ungrouped</h3>
-            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
-                ${categoriesHtml}
-            </div>
-            <button onclick="showAddCategoryInline(null, event);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -306,15 +314,30 @@ function renderBudgetCategory(category, summary) {
     const isPaymentCategory = category.payment_for_account_id != null;
     const isUnderfunded = summaryItem?.underfunded && summaryItem.underfunded > 0;
 
+    // For payment categories, get the credit card account balance
+    let cardBalanceDisplay = '';
+    if (isPaymentCategory) {
+        const creditCardAccount = accounts.find(acc => acc.id === category.payment_for_account_id);
+        if (creditCardAccount) {
+            const cardBalance = Math.abs(creditCardAccount.balance);
+            const balanceClass = creditCardAccount.balance < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400';
+            cardBalanceDisplay = `
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 dark:text-gray-400">Card Balance</div>
+                    <div class="font-medium text-sm ${balanceClass}">${formatCurrency(cardBalance)}</div>
+                </div>`;
+        }
+    }
+
     const allocatedDisplay = isPaymentCategory
-        ? `<div class="font-semibold text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
-        : `<div class="font-semibold text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
+        ? `<div class="font-medium text-sm text-gray-800 dark:text-gray-100" title="Auto-allocated">${formatCurrency(allocated)}</div>`
+        : `<div class="font-medium text-sm text-gray-800 dark:text-gray-100 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-2 py-1 -mx-2 -my-1 no-drag"
                 onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                 title="Click to edit">${formatCurrency(allocated)}</div>`;
 
     const underfundedWarning = isUnderfunded
-        ? `<div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
-            <span class="text-red-600 dark:text-red-400 font-semibold">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+        ? `<div class="mt-1 p-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs">
+            <span class="text-red-600 dark:text-red-400 font-medium">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
         </div>` : '';
 
     const deleteButton = isPaymentCategory
@@ -325,30 +348,31 @@ function renderBudgetCategory(category, summary) {
                    title="Delete category">✕</button>`;
 
     return `
-        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
+        <div class="budget-category border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-800 cursor-move ${isPaymentCategory ? 'bg-orange-50 dark:bg-orange-900/20' : ''}"
              data-category-id="${category.id}"
              data-payment-category="${isPaymentCategory}"
              data-group-id="${category.group_id || 'ungrouped'}">
             <div class="flex justify-between items-center">
-                <div class="flex items-center gap-3 flex-1">
+                <div class="flex items-center gap-2 flex-1">
                     <span class="text-gray-400 dark:text-gray-500 text-xs">⋮⋮</span>
-                    <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
+                    <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${category.color || '#3b82f6'}"></div>
                     <div class="flex-1">
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${category.name}</div>
+                        <div class="font-medium text-sm text-gray-800 dark:text-gray-100">${category.name}</div>
                     </div>
                 </div>
-                <div class="flex gap-6 items-center">
+                <div class="flex gap-4 items-center">
+                    ${cardBalanceDisplay}
                     <div class="text-right">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Allocated</div>
                         ${allocatedDisplay}
                     </div>
                     <div class="text-right">
-                        <div class="text-xs text-gray-500 dark:text-gray-400">Spent</div>
-                        <div class="font-semibold text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">${isPaymentCategory ? 'Paid' : 'Spent'}</div>
+                        <div class="font-medium text-sm text-gray-800 dark:text-gray-100">${formatCurrency(spent)}</div>
                     </div>
-                    <div class="text-right min-w-[100px]">
+                    <div class="text-right min-w-[80px]">
                         <div class="text-xs text-gray-500 dark:text-gray-400">Available</div>
-                        <div class="font-bold ${availableClass}">${formatCurrency(available)}</div>
+                        <div class="font-semibold text-sm ${availableClass}">${formatCurrency(available)}</div>
                     </div>
                     ${deleteButton}
                 </div>
@@ -391,12 +415,21 @@ function initializeBudgetDragDrop() {
                         return false; // Prevent the move
                     }
 
+                    // Prevent moving ANY categories into the Credit Card Payments group
+                    const targetGroup = evt.to.closest('.budget-group');
+                    const isTargetAutoManaged = targetGroup && targetGroup.dataset.autoManaged === 'true';
+
+                    if (isTargetAutoManaged && currentGroupId !== targetGroupId) {
+                        showToast('Cannot add categories to the Credit Card Payments group - it is auto-managed', 'error');
+                        return false; // Prevent the move
+                    }
+
                     return true; // Allow the move
                 },
                 onEnd: async function(evt) {
                     const categoryId = evt.item.dataset.categoryId;
                     const newGroupId = evt.to.dataset.groupId;
-                    await updateCategoryGroup(categoryId, newGroupId === 'ungrouped' ? null : newGroupId);
+                    await updateCategoryGroup(categoryId, newGroupId);
                 }
             });
         });
@@ -404,7 +437,7 @@ function initializeBudgetDragDrop() {
 }
 
 async function updateGroupOrder() {
-    const groups = [...document.querySelectorAll('.budget-group[data-group-id]:not([data-group-id="ungrouped"])')];
+    const groups = [...document.querySelectorAll('.budget-group[data-group-id]')];
     for (let i = 0; i < groups.length; i++) {
         const groupId = groups[i].dataset.groupId;
         try {
@@ -420,14 +453,15 @@ async function updateGroupOrder() {
 
 async function updateCategoryGroup(categoryId, groupId) {
     try {
-        if (groupId) {
-            await apiCall('/category-groups/assign', {
-                method: 'POST',
-                body: JSON.stringify({ category_id: categoryId, group_id: groupId })
-            });
-        } else {
-            await apiCall(`/category-groups/unassign/${categoryId}`, { method: 'POST' });
+        if (!groupId) {
+            showToast('Categories must belong to a group', 'error');
+            loadBudgetView(); // Reload to reset UI
+            return;
         }
+        await apiCall('/category-groups/assign', {
+            method: 'POST',
+            body: JSON.stringify({ category_id: categoryId, group_id: groupId })
+        });
         showToast('Category moved successfully!');
     } catch (error) {
         console.error('Failed to update category group:', error);
@@ -458,7 +492,7 @@ async function showAddGroupInline() {
 }
 
 async function deleteGroup(groupId) {
-    if (!confirm('Delete this group? Categories will be moved to Ungrouped.')) return;
+    if (!confirm('Delete this group? You must move or delete all categories in this group first.')) return;
 
     try {
         await apiCall(`/category-groups/${groupId}`, { method: 'DELETE' });
@@ -467,13 +501,56 @@ async function deleteGroup(groupId) {
         showToast('Group deleted successfully!');
     } catch (error) {
         console.error('Failed to delete group:', error);
+        showToast('Cannot delete group: it still contains categories. Please move or delete all categories first.', 'error');
     }
 }
 
+function toggleGroupCollapse(groupId) {
+    if (collapsedGroups.has(groupId)) {
+        collapsedGroups.delete(groupId);
+    } else {
+        collapsedGroups.add(groupId);
+    }
+    updateExpandCollapseButton();
+    loadBudgetView();
+}
+
+function toggleExpandCollapseAll() {
+    // If all groups are collapsed, expand all; otherwise collapse all
+    const allCollapsed = categoryGroups.length > 0 && collapsedGroups.size === categoryGroups.length;
+
+    if (allCollapsed) {
+        // Expand all
+        collapsedGroups.clear();
+    } else {
+        // Collapse all
+        collapsedGroups.clear();
+        categoryGroups.forEach(group => collapsedGroups.add(group.id));
+    }
+
+    updateExpandCollapseButton();
+    loadBudgetView();
+}
+
+function updateExpandCollapseButton() {
+    const button = document.getElementById('expand-collapse-btn');
+    if (!button) return;
+
+    const allCollapsed = categoryGroups.length > 0 && collapsedGroups.size === categoryGroups.length;
+    button.textContent = allCollapsed ? 'Expand All' : 'Collapse All';
+}
+
+// Make functions available globally for onclick handlers
+window.toggleGroupCollapse = toggleGroupCollapse;
+window.toggleExpandCollapseAll = toggleExpandCollapseAll;
+
 // Inline category management functions
 function showAddCategoryInline(groupId, event) {
-    // Normalize groupId - convert "null" string or null to empty string
-    const normalizedGroupId = (groupId && groupId !== 'null') ? groupId : '';
+    // Validate groupId is required
+    if (!groupId || groupId === 'null') {
+        showToast('Cannot add category: group is required', 'error');
+        return;
+    }
 
     const colors = [
         { hex: '#f97316', name: 'Orange' },
@@ -496,9 +573,7 @@ function showAddCategoryInline(groupId, event) {
                  title="${color.name}"></button>`
     ).join('');
 
-    const groupSelector = normalizedGroupId
-        ? `<input type="hidden" id="inline-category-group" value="${normalizedGroupId}">`
-        : `<input type="hidden" id="inline-category-group" value="">`;
+    const groupSelector = `<input type="hidden" id="inline-category-group" value="${groupId}">`;
 
     const formHtml = `
         <div id="inline-category-form" class="bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-lg p-4 mt-2">
@@ -534,9 +609,7 @@ function showAddCategoryInline(groupId, event) {
         targetButton.insertAdjacentHTML('beforebegin', formHtml);
     } else {
         // Fallback: append to the appropriate group container
-        const targetContainer = normalizedGroupId
-            ? document.querySelector(`.group-categories[data-group-id="${normalizedGroupId}"]`)
-            : document.querySelector('.group-categories[data-group-id="ungrouped"]');
+        const targetContainer = document.querySelector(`.group-categories[data-group-id="${groupId}"]`);
         if (targetContainer) {
             targetContainer.insertAdjacentHTML('afterend', formHtml);
         }
@@ -581,6 +654,12 @@ async function saveInlineCategory() {
         return;
     }
 
+    // Validate groupId is required
+    if (!groupId || groupId === '' || groupId === 'null') {
+        showToast('Group is required for all categories', 'error');
+        return;
+    }
+
     try {
         const categoryData = {
             name,
@@ -593,9 +672,8 @@ async function saveInlineCategory() {
             body: JSON.stringify(categoryData)
         });
 
-        // If group is specified, assign category to group
-        // Check for valid group ID (not empty string and not the string "null")
-        if (groupId && groupId !== '' && groupId !== 'null' && newCategory.id) {
+        // Assign category to group
+        if (newCategory.id) {
             await apiCall('/category-groups/assign', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -667,7 +745,17 @@ async function loadAccountsView() {
         }
 
         accountsList.innerHTML = accounts.map(account => {
+            const isCreditCard = account.type === 'credit';
             const balanceClass = account.balance >= 0 ? 'text-green-600' : 'text-red-600';
+
+            // For credit cards, show "Owe $X.XX" instead of negative amount
+            let balanceDisplay;
+            if (isCreditCard && account.balance < 0) {
+                balanceDisplay = `<span class="text-sm text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+            } else {
+                balanceDisplay = formatCurrency(account.balance);
+            }
+
             return `
                 <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div class="flex justify-between items-center">
@@ -676,7 +764,7 @@ async function loadAccountsView() {
                             <div class="text-sm text-gray-500 dark:text-gray-400 capitalize">${account.type}</div>
                         </div>
                         <div class="text-right">
-                            <div class="text-xl font-bold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                            <div class="text-xl font-bold ${balanceClass}">${balanceDisplay}</div>
                         </div>
                     </div>
                 </div>
@@ -866,6 +954,15 @@ async function showAddTransactionModal() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('transaction-date').value = today;
 
+    // Reset amount label and hint to defaults
+    const amountLabel = document.getElementById('amount-label');
+    const amountHint = document.getElementById('amount-hint');
+    const amountInput = document.getElementById('transaction-amount');
+    amountLabel.textContent = 'Amount *';
+    amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+    amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+    amountInput.removeAttribute('min');
+
     showModal('transaction-modal');
 }
 
@@ -916,10 +1013,64 @@ function showAddCategoryModal() {
 
 function showAllocateModal(categoryId, categoryName, currentAmount = 0) {
     document.getElementById('allocation-category-id').value = categoryId;
+    document.getElementById('allocation-current-amount').value = currentAmount; // Store in cents
     document.getElementById('allocation-category-name').textContent = categoryName;
     document.getElementById('allocation-amount').value = (currentAmount / 100).toFixed(2);
     document.getElementById('allocation-notes').value = '';
     showModal('allocation-modal');
+}
+
+// Helper function to parse allocation input with math operators
+function parseAllocationInput(inputValue, currentAmountInCents) {
+    const trimmed = inputValue.trim();
+
+    // Check if input starts with a math operator
+    const operatorMatch = trimmed.match(/^([+\-*/])(.+)$/);
+
+    if (operatorMatch) {
+        const operator = operatorMatch[1];
+        const operand = parseFloat(operatorMatch[2]);
+
+        if (isNaN(operand)) {
+            return { valid: false, error: 'Invalid number after operator' };
+        }
+
+        const currentAmountInDollars = currentAmountInCents / 100;
+        let result;
+
+        switch (operator) {
+            case '+':
+                result = currentAmountInDollars + operand;
+                break;
+            case '-':
+                result = currentAmountInDollars - operand;
+                break;
+            case '*':
+                result = currentAmountInDollars * operand;
+                break;
+            case '/':
+                if (operand === 0) {
+                    return { valid: false, error: 'Cannot divide by zero' };
+                }
+                result = currentAmountInDollars / operand;
+                break;
+        }
+
+        if (result < 0) {
+            return { valid: false, error: 'Result cannot be negative' };
+        }
+
+        return { valid: true, amountInCents: Math.round(result * 100) };
+    }
+
+    // No operator, treat as absolute value
+    const amount = parseFloat(trimmed);
+
+    if (isNaN(amount) || amount < 0) {
+        return { valid: false, error: 'Please enter a valid amount' };
+    }
+
+    return { valid: true, amountInCents: Math.round(amount * 100) };
 }
 
 // Inline editing for budget allocation
@@ -933,11 +1084,10 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
 
     // Create input element
     const input = document.createElement('input');
-    input.type = 'number';
-    input.step = '0.01';
-    input.min = '0';
+    input.type = 'text';
     input.value = (currentAmount / 100).toFixed(2);
     input.className = 'w-24 border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-center font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+    input.placeholder = 'e.g. +50, -25, 100';
 
     // Replace content with input
     clickedElement.innerHTML = '';
@@ -947,15 +1097,15 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
 
     // Function to save the allocation
     const saveAllocation = async () => {
-        const newAmount = parseFloat(input.value);
+        const result = parseAllocationInput(input.value, currentAmount);
 
-        if (isNaN(newAmount) || newAmount < 0) {
-            showToast('Please enter a valid amount', 'error');
+        if (!result.valid) {
+            showToast(result.error, 'error');
             clickedElement.innerHTML = originalContent;
             return;
         }
 
-        const amountInCents = Math.round(newAmount * 100);
+        const amountInCents = result.amountInCents;
 
         // Only save if the amount changed
         if (amountInCents !== currentAmount) {
@@ -1004,14 +1154,226 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     });
 }
 
+// Inline category name editing
+async function startCategoryNameEdit(categoryId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Category name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/categories/${categoryId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        color: '', // Will be preserved by backend
+                        description: ''
+                    })
+                });
+
+                showToast('Category name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update category name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+
+// Show color picker for category
+function showColorPicker(categoryId, currentColor) {
+    const colors = [
+        { hex: '#f97316', name: 'Orange' },
+        { hex: '#3b82f6', name: 'Blue' },
+        { hex: '#10b981', name: 'Green' },
+        { hex: '#a855f7', name: 'Purple' },
+        { hex: '#ef4444', name: 'Red' },
+        { hex: '#ec4899', name: 'Pink' },
+        { hex: '#eab308', name: 'Yellow' },
+        { hex: '#6366f1', name: 'Indigo' },
+        { hex: '#14b8a6', name: 'Teal' },
+        { hex: '#6b7280', name: 'Gray' }
+    ];
+
+    const colorButtons = colors.map(color =>
+        `<button onclick="updateCategoryColor('${categoryId}', '${color.hex}');"
+                 class="w-8 h-8 rounded-full hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition ${color.hex === currentColor ? 'ring-2 ring-blue-600' : ''}"
+                 style="background-color: ${color.hex}"
+                 title="${color.name}"></button>`
+    ).join('');
+
+    const picker = document.createElement('div');
+    picker.id = 'color-picker-popup';
+    picker.className = 'fixed bg-white border-2 border-gray-300 rounded-lg shadow-xl p-4 z-50';
+    picker.style.left = event.pageX + 'px';
+    picker.style.top = event.pageY + 'px';
+    picker.innerHTML = `
+        <div class="mb-2 text-sm font-semibold text-gray-700">Select Color</div>
+        <div class="grid grid-cols-5 gap-2 mb-2">
+            ${colorButtons}
+        </div>
+        <button onclick="closeColorPicker()" class="text-xs text-gray-600 hover:text-gray-800 w-full">Cancel</button>
+    `;
+
+    // Remove any existing picker
+    const existing = document.getElementById('color-picker-popup');
+    if (existing) existing.remove();
+
+    document.body.appendChild(picker);
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeOnClickOutside(e) {
+            if (!picker.contains(e.target)) {
+                closeColorPicker();
+                document.removeEventListener('click', closeOnClickOutside);
+            }
+        });
+    }, 100);
+}
+
+function closeColorPicker() {
+    const picker = document.getElementById('color-picker-popup');
+    if (picker) picker.remove();
+}
+
+async function updateCategoryColor(categoryId, newColor) {
+    closeColorPicker();
+
+    try {
+        await apiCall(`/categories/${categoryId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: '', // Will be preserved by backend
+                color: newColor,
+                description: ''
+            })
+        });
+
+        showToast('Color updated!');
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to update category color:', error);
+    }
+}
+async function startGroupNameEdit(groupId, currentName) {
+    const clickedElement = event.target;
+    const originalContent = clickedElement.innerHTML;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'border border-blue-500 dark:border-blue-400 rounded px-2 py-1 text-lg font-semibold bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400';
+
+    clickedElement.innerHTML = '';
+    clickedElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    const saveName = async () => {
+        const newName = input.value.trim();
+
+        if (!newName) {
+            showToast('Group name cannot be empty', 'error');
+            clickedElement.innerHTML = originalContent;
+            return;
+        }
+
+        if (newName !== currentName) {
+            try {
+                await apiCall(`/category-groups/${groupId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name: newName,
+                        description: '',
+                        display_order: 0 // Will be preserved by backend
+                    })
+                });
+
+                showToast('Group name updated!');
+                loadBudgetView();
+            } catch (error) {
+                console.error('Failed to update group name:', error);
+                clickedElement.innerHTML = originalContent;
+            }
+        } else {
+            clickedElement.innerHTML = originalContent;
+        }
+    };
+
+    const cancelEdit = () => {
+        clickedElement.innerHTML = originalContent;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveName();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelEdit();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => saveName(), 100);
+    });
+}
+
+// Make function globally available
+window.startGroupNameEdit = startGroupNameEdit;
+
 // Load uncategorized transactions
 async function loadUncategorizedTransactions() {
     try {
         const transactions = await apiCall('/transactions?uncategorized=true');
 
+        // Filter to only show outflows (negative amounts) - inflows don't need categorization
+        const outflows = transactions.filter(txn => txn.amount < 0);
+
         const listContainer = document.getElementById('uncategorized-list');
 
-        if (transactions.length === 0) {
+        if (outflows.length === 0) {
             listContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center py-4">No uncategorized transactions</p>';
             return;
         }
@@ -1021,7 +1383,7 @@ async function loadUncategorizedTransactions() {
                 <button onclick="selectAllUncategorized()" class="btn-secondary text-sm">Select All</button>
                 <button onclick="showCategorizeModal()" class="btn-primary text-sm">Categorize Selected</button>
             </div>
-            ${transactions.map(txn => {
+            ${outflows.map(txn => {
                 const account = accounts.find(a => a.id === txn.account_id);
                 const amountClass = txn.amount >= 0 ? 'text-green-600' : 'text-red-600';
                 return `
@@ -1089,17 +1451,47 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme
     initializeTheme();
 
-    // Add listener for transaction type change to update category requirement
-    document.getElementById('transaction-type').addEventListener('change', function() {
+    // Add listener for account change to update amount hint text
+    document.getElementById('transaction-account').addEventListener('change', function() {
+        const amountLabel = document.getElementById('amount-label');
+        const amountHint = document.getElementById('amount-hint');
+        const amountInput = document.getElementById('transaction-amount');
+        const selectedAccountId = this.value;
+
+        if (!selectedAccountId) {
+            amountLabel.textContent = 'Amount *';
+            amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+            amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+            return;
+        }
+
+        const selectedAccount = accounts.find(a => a.id === selectedAccountId);
+
+        if (selectedAccount && selectedAccount.type === 'credit') {
+            amountLabel.textContent = 'How much did you spend? *';
+            amountHint.textContent = 'Enter amount spent (we\'ll deduct it automatically). To make a payment, use the Transfer button.';
+            amountInput.placeholder = '45.67';
+            amountInput.min = '0.01'; // Only allow positive amounts for spending
+        } else {
+            amountLabel.textContent = 'Amount *';
+            amountHint.textContent = 'Enter positive for inflow, negative for outflow';
+            amountInput.placeholder = '-45.67 for outflow, 2500.00 for inflow';
+            amountInput.removeAttribute('min'); // Allow negative amounts for regular accounts
+        }
+    });
+
+    // Add listener for amount change to update category requirement
+    document.getElementById('transaction-amount').addEventListener('input', function() {
         const categorySelect = document.getElementById('transaction-category');
         const categoryIndicator = document.getElementById('category-required-indicator');
+        const amount = parseFloat(this.value);
 
-        if (this.value === 'inflow') {
-            // Income: category is optional
+        if (amount > 0 || isNaN(amount)) {
+            // Inflow or empty: category is optional
             categorySelect.removeAttribute('required');
             categoryIndicator.textContent = '';
         } else {
-            // Expense: category is required
+            // Outflow (negative): category is required
             categorySelect.setAttribute('required', 'required');
             categoryIndicator.textContent = '*';
         }
@@ -1128,8 +1520,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const accountId = document.getElementById('transaction-account').value;
         const categoryId = document.getElementById('transaction-category').value;
-        const amount = parseFloat(document.getElementById('transaction-amount').value);
-        const type = document.getElementById('transaction-type').value;
+        let amount = parseFloat(document.getElementById('transaction-amount').value);
         const date = document.getElementById('transaction-date').value;
         const description = document.getElementById('transaction-description').value;
 
@@ -1138,14 +1529,26 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Category is required for outflow but optional for inflow
-        if (type === 'outflow' && !categoryId) {
-            showToast('Please select a category for expenses', 'error');
+        // For credit card accounts, auto-negate positive amounts (spending)
+        // Payments to credit cards should be done via transfers, not this form
+        const selectedAccount = accounts.find(a => a.id === accountId);
+        if (selectedAccount && selectedAccount.type === 'credit') {
+            if (amount < 0) {
+                showToast('To make a credit card payment, use the Transfer button instead', 'error');
+                return;
+            }
+            // Auto-negate for spending
+            amount = -amount;
+        }
+
+        // Category is required for outflows (negative amounts) but optional for inflows
+        if (amount < 0 && !categoryId) {
+            showToast('Please select a category for outflows', 'error');
             return;
         }
 
-        // Convert amount to cents, negative for outflow
-        const amountInCents = Math.round((type === 'outflow' ? -amount : amount) * 100);
+        // Convert amount to cents
+        const amountInCents = Math.round(amount * 100);
 
         try {
             await apiCall('/transactions', {
@@ -1285,16 +1688,24 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         const categoryId = document.getElementById('allocation-category-id').value;
-        const amount = parseFloat(document.getElementById('allocation-amount').value);
+        const currentAmount = parseInt(document.getElementById('allocation-current-amount').value) || 0;
+        const inputValue = document.getElementById('allocation-amount').value;
         const notes = document.getElementById('allocation-notes').value;
         const period = getCurrentPeriod();
+
+        const result = parseAllocationInput(inputValue, currentAmount);
+
+        if (!result.valid) {
+            showToast(result.error, 'error');
+            return;
+        }
 
         try {
             await apiCall('/allocations', {
                 method: 'POST',
                 body: JSON.stringify({
                     category_id: categoryId,
-                    amount: Math.round(amount * 100),
+                    amount: result.amountInCents,
                     period,
                     notes
                 })
@@ -1425,14 +1836,24 @@ async function renderAccountsSidebar() {
     `;
 
     accounts.forEach(account => {
+        const isCreditCard = account.type === 'credit';
         const balanceClass = account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+
+        // For credit cards, show "Owe $X.XX" instead of negative amount
+        let balanceDisplay;
+        if (isCreditCard && account.balance < 0) {
+            balanceDisplay = `<span class="text-xs text-gray-500 dark:text-gray-400">Owe </span>${formatCurrency(Math.abs(account.balance))}`;
+        } else {
+            balanceDisplay = formatCurrency(account.balance);
+        }
+
         html += `
             <div class="account-item cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="loadAccountTransactionsPanel('${account.id}')">
                 <div class="flex justify-between items-start">
                     <div class="font-medium text-gray-900 dark:text-gray-100 text-sm">${account.name}</div>
                     <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${account.type}</span>
                 </div>
-                <div class="text-sm font-semibold ${balanceClass}">${formatCurrency(account.balance)}</div>
+                <div class="text-sm font-semibold ${balanceClass}">${balanceDisplay}</div>
             </div>
         `;
     });
@@ -1449,16 +1870,19 @@ async function renderUncategorizedTransactions() {
     try {
         const uncategorized = await apiCall('/transactions?uncategorized=true');
 
-        if (!uncategorized || uncategorized.length === 0) {
+        // Filter to only show outflows (negative amounts) - inflows don't need categorization
+        const outflows = uncategorized.filter(txn => txn.amount < 0);
+
+        if (!outflows || outflows.length === 0) {
             container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">All caught up!</p>';
             countSpan.textContent = '';
             return;
         }
 
-        countSpan.textContent = `(${uncategorized.length})`;
+        countSpan.textContent = `(${outflows.length})`;
 
         // Show first 5
-        const toShow = uncategorized.slice(0, 5);
+        const toShow = outflows.slice(0, 5);
         let html = '';
 
         for (const txn of toShow) {
@@ -1482,8 +1906,8 @@ async function renderUncategorizedTransactions() {
             `;
         }
 
-        if (uncategorized.length > 5) {
-            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${uncategorized.length - 5} more</p>`;
+        if (outflows.length > 5) {
+            html += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">+${outflows.length - 5} more</p>`;
         }
 
         container.innerHTML = html;
@@ -1498,10 +1922,18 @@ async function quickCategorize(transactionId, categoryId) {
     if (!categoryId) return;
 
     try {
+        // Fetch the existing transaction to get all fields
+        const transaction = await apiCall(`/transactions/${transactionId}`);
+
+        // Update with all fields, only changing the category
         await apiCall(`/transactions/${transactionId}`, {
             method: 'PUT',
             body: JSON.stringify({
-                category_id: categoryId
+                account_id: transaction.account_id,
+                category_id: categoryId,
+                amount: transaction.amount,
+                description: transaction.description,
+                date: transaction.date
             })
         });
 

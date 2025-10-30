@@ -94,7 +94,10 @@
 
                     <div class="mb-4 flex justify-between items-center">
                         <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Categories</h3>
-                        <button onclick="showAddGroupInline()" class="btn-secondary text-sm">+ Add Group</button>
+                        <div class="flex gap-2">
+                            <button onclick="toggleExpandCollapseAll()" id="expand-collapse-btn" class="btn-secondary text-sm">Expand All</button>
+                            <button onclick="showAddGroupInline()" class="btn-secondary text-sm">+ Add Group</button>
+                        </div>
                     </div>
 
                     <div id="budget-categories" class="space-y-4">
@@ -171,18 +174,12 @@
                     <select id="transaction-category" class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                         <option value="">Select category...</option>
                     </select>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" id="category-hint">Required for expenses, optional for income</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" id="category-hint">Required for outflows, optional for inflows</p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type *</label>
-                    <select id="transaction-type" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                        <option value="inflow">Inflow (Income)</option>
-                        <option value="outflow" selected>Outflow (Expense)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount *</label>
-                    <input type="number" id="transaction-amount" step="0.01" min="0.01" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="0.00">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" id="amount-label">Amount *</label>
+                    <input type="number" id="transaction-amount" step="0.01" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="-45.67 for outflow, 2500.00 for inflow">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" id="amount-hint">Enter positive for inflow, negative for outflow</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date *</label>
@@ -330,14 +327,15 @@
             <h3 class="text-xl font-bold mb-4 dark:text-gray-100">Allocate Budget</h3>
             <form id="allocation-form" class="space-y-4">
                 <input type="hidden" id="allocation-category-id">
+                <input type="hidden" id="allocation-current-amount">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
                     <div id="allocation-category-name" class="text-lg font-semibold text-gray-800 dark:text-gray-100"></div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount to Allocate *</label>
-                    <input type="number" id="allocation-amount" step="0.01" min="0" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="0.00">
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">This will replace any existing allocation for this month</p>
+                    <input type="text" id="allocation-amount" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="100 or +50 or -25 or *2 or /2">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enter an amount, or use +/- to add/subtract, or */÷ to multiply/divide the current allocation</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
@@ -357,10 +355,11 @@
             <h3 class="text-xl font-bold mb-4 dark:text-gray-100">Assign Category</h3>
             <form id="categorize-form" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Category *</label>
-                    <select id="categorize-category" required class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                        <option value="">Select category...</option>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Category</label>
+                    <select id="categorize-category" class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                        <option value="">Leave uncategorized (for inflows)</option>
                     </select>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leave blank for inflow transactions to flow into Ready to Assign</p>
                 </div>
                 <div class="text-sm text-gray-600 dark:text-gray-400">
                     <span id="categorize-count">0</span> transaction(s) selected

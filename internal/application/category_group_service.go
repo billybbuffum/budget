@@ -86,7 +86,7 @@ func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name
 }
 
 // DeleteCategoryGroup deletes a category group
-// Before deletion, it unassigns all categories from this group
+// Returns an error if the group contains any categories
 func (s *CategoryGroupService) DeleteCategoryGroup(ctx context.Context, id string) error {
 	// Get the group to check if it's the credit card payments group
 	group, err := s.categoryGroupRepo.GetByID(ctx, id)
@@ -105,13 +105,9 @@ func (s *CategoryGroupService) DeleteCategoryGroup(ctx context.Context, id strin
 		return fmt.Errorf("failed to get categories in group: %w", err)
 	}
 
-	// Unassign all categories from this group
-	for _, category := range categories {
-		category.GroupID = nil
-		category.UpdatedAt = time.Now()
-		if err := s.categoryRepo.Update(ctx, category); err != nil {
-			return fmt.Errorf("failed to unassign category %s: %w", category.ID, err)
-		}
+	// Prevent deletion if group contains categories
+	if len(categories) > 0 {
+		return fmt.Errorf("cannot delete category group: it contains %d categories. Please move or delete all categories first", len(categories))
 	}
 
 	// Delete the group
@@ -127,9 +123,15 @@ func (s *CategoryGroupService) AssignCategoryToGroup(ctx context.Context, catego
 	}
 
 	// Verify the group exists
-	_, err = s.categoryGroupRepo.GetByID(ctx, groupID)
+	group, err := s.categoryGroupRepo.GetByID(ctx, groupID)
 	if err != nil {
 		return fmt.Errorf("category group not found: %w", err)
+	}
+
+	// Prevent assigning non-payment categories to the Credit Card Payments group
+	// Only auto-created payment categories should be in this group
+	if group.Name == domain.CreditCardPaymentsGroupName && category.PaymentForAccountID == nil {
+		return fmt.Errorf("cannot manually add categories to the Credit Card Payments group - it is auto-managed")
 	}
 
 	// Note: We no longer validate category-group type matching since categories don't have types
@@ -146,28 +148,10 @@ func (s *CategoryGroupService) AssignCategoryToGroup(ctx context.Context, catego
 	return nil
 }
 
-// UnassignCategoryFromGroup removes a category from its group
+// UnassignCategoryFromGroup is deprecated - categories must always belong to a group
+// This method now returns an error to maintain backward compatibility with existing API
 func (s *CategoryGroupService) UnassignCategoryFromGroup(ctx context.Context, categoryID string) error {
-	// Get the category
-	category, err := s.categoryRepo.GetByID(ctx, categoryID)
-	if err != nil {
-		return fmt.Errorf("category not found: %w", err)
-	}
-
-	// Prevent ungrouping credit card payment categories
-	if category.PaymentForAccountID != nil {
-		return fmt.Errorf("cannot ungroup credit card payment categories")
-	}
-
-	// Unassign the category from its group
-	category.GroupID = nil
-	category.UpdatedAt = time.Now()
-
-	if err := s.categoryRepo.Update(ctx, category); err != nil {
-		return fmt.Errorf("failed to unassign category from group: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("categories must belong to a group. Use AssignCategoryToGroup to move this category to a different group")
 }
 
 // GetCreditCardPaymentsGroup finds the credit card payments group
