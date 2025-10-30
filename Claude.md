@@ -264,8 +264,18 @@ docker-compose up -d
 
 ### Local Go Development
 ```bash
+# Install npm dependencies and build CSS
+npm install
+npm run build:css
+
+# Run the Go application
 go mod download
 go run cmd/server/main.go
+```
+
+**Note:** During development, you can run Tailwind in watch mode to automatically rebuild CSS on changes:
+```bash
+npm run watch:css
 ```
 
 ### Docker Direct

@@ -429,6 +429,17 @@ function showAddAccountModal() {
 
 function showAddCategoryModal() {
     document.getElementById('category-form').reset();
+    // Reset color swatches to default (blue)
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+        swatch.classList.remove('selected');
+        swatch.querySelector('.color-check').classList.add('hidden');
+    });
+    const defaultSwatch = document.querySelector('.color-swatch[data-color="#3b82f6"]');
+    if (defaultSwatch) {
+        defaultSwatch.classList.add('selected');
+        defaultSwatch.querySelector('.color-check').classList.remove('hidden');
+    }
+    document.getElementById('category-color').value = '#3b82f6';
     showModal('category-modal');
 }
 
@@ -604,6 +615,23 @@ async function loadImportView() {
 
 // Form submissions
 document.addEventListener('DOMContentLoaded', function() {
+    // Color swatch selection
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+        swatch.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Remove selected class from all swatches
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('selected');
+                s.querySelector('.color-check').classList.add('hidden');
+            });
+            // Add selected class to clicked swatch
+            this.classList.add('selected');
+            this.querySelector('.color-check').classList.remove('hidden');
+            // Update hidden input
+            document.getElementById('category-color').value = this.dataset.color;
+        });
+    });
+
     // Transaction form
     document.getElementById('transaction-form').addEventListener('submit', async (e) => {
         e.preventDefault();
