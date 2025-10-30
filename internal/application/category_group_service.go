@@ -62,6 +62,11 @@ func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name
 		return nil, err
 	}
 
+	// Prevent renaming the credit card payments group
+	if group.Name == domain.CreditCardPaymentsGroupName && name != "" && name != domain.CreditCardPaymentsGroupName {
+		return nil, fmt.Errorf("cannot rename the Credit Card Payments group")
+	}
+
 	if name != "" {
 		group.Name = name
 	}
@@ -83,6 +88,17 @@ func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name
 // DeleteCategoryGroup deletes a category group
 // Before deletion, it unassigns all categories from this group
 func (s *CategoryGroupService) DeleteCategoryGroup(ctx context.Context, id string) error {
+	// Get the group to check if it's the credit card payments group
+	group, err := s.categoryGroupRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Prevent deleting the credit card payments group
+	if group.Name == domain.CreditCardPaymentsGroupName {
+		return fmt.Errorf("cannot delete the Credit Card Payments group")
+	}
+
 	// Get all categories in this group
 	categories, err := s.categoryRepo.ListByGroup(ctx, id)
 	if err != nil {
@@ -138,6 +154,11 @@ func (s *CategoryGroupService) UnassignCategoryFromGroup(ctx context.Context, ca
 		return fmt.Errorf("category not found: %w", err)
 	}
 
+	// Prevent ungrouping credit card payment categories
+	if category.PaymentForAccountID != nil {
+		return fmt.Errorf("cannot ungroup credit card payment categories")
+	}
+
 	// Unassign the category from its group
 	category.GroupID = nil
 	category.UpdatedAt = time.Now()
@@ -147,4 +168,88 @@ func (s *CategoryGroupService) UnassignCategoryFromGroup(ctx context.Context, ca
 	}
 
 	return nil
+}
+
+// GetCreditCardPaymentsGroup finds the credit card payments group
+// Returns nil if the group doesn't exist
+func (s *CategoryGroupService) GetCreditCardPaymentsGroup(ctx context.Context) (*domain.CategoryGroup, error) {
+	groups, err := s.categoryGroupRepo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list category groups: %w", err)
+	}
+
+	for _, group := range groups {
+		if group.Name == domain.CreditCardPaymentsGroupName {
+			return group, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// EnsureCreditCardPaymentsGroup creates the credit card payments group if it doesn't exist
+// Returns the existing or newly created group
+func (s *CategoryGroupService) EnsureCreditCardPaymentsGroup(ctx context.Context) (*domain.CategoryGroup, error) {
+	// Check if the group already exists
+	existingGroup, err := s.GetCreditCardPaymentsGroup(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if existingGroup != nil {
+		return existingGroup, nil
+	}
+
+	// Create the group at the bottom of the list (high display order)
+	group := &domain.CategoryGroup{
+		ID:           uuid.New().String(),
+		Name:         domain.CreditCardPaymentsGroupName,
+		Description:  "Payment categories for credit card accounts",
+		DisplayOrder: 9999, // Place at bottom
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	if err := s.categoryGroupRepo.Create(ctx, group); err != nil {
+		return nil, fmt.Errorf("failed to create credit card payments group: %w", err)
+	}
+
+	return group, nil
+}
+
+// DeleteCreditCardPaymentsGroupIfEmpty deletes the credit card payments group if it has no categories
+func (s *CategoryGroupService) DeleteCreditCardPaymentsGroupIfEmpty(ctx context.Context) error {
+	// Find the credit card payments group
+	group, err := s.GetCreditCardPaymentsGroup(ctx)
+	if err != nil {
+		return err
+	}
+	if group == nil {
+		// Group doesn't exist, nothing to do
+		return nil
+	}
+
+	// Check if the group has any categories
+	categories, err := s.categoryRepo.ListByGroup(ctx, group.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get categories in group: %w", err)
+	}
+
+	// Only delete if the group is empty
+	if len(categories) == 0 {
+		if err := s.categoryGroupRepo.Delete(ctx, group.ID); err != nil {
+			return fmt.Errorf("failed to delete empty credit card payments group: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// IsCreditCardPaymentsGroup checks if the given group ID belongs to the credit card payments group
+func (s *CategoryGroupService) IsCreditCardPaymentsGroup(ctx context.Context, groupID string) (bool, error) {
+	group, err := s.categoryGroupRepo.GetByID(ctx, groupID)
+	if err != nil {
+		return false, err
+	}
+
+	return group.Name == domain.CreditCardPaymentsGroupName, nil
 }
