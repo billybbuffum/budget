@@ -49,14 +49,25 @@ func initSchema(db *sql.DB) error {
 		updated_at DATETIME NOT NULL
 	);
 
+	CREATE TABLE IF NOT EXISTS category_groups (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT,
+		display_order INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL
+	);
+
 	CREATE TABLE IF NOT EXISTS categories (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		description TEXT,
 		color TEXT,
+		group_id TEXT NOT NULL,
 		payment_for_account_id TEXT,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
+		FOREIGN KEY (group_id) REFERENCES category_groups(id) ON DELETE RESTRICT,
 		FOREIGN KEY (payment_for_account_id) REFERENCES accounts(id) ON DELETE CASCADE
 	);
 
@@ -94,6 +105,7 @@ func initSchema(db *sql.DB) error {
 		updated_at DATETIME NOT NULL
 	);
 
+	CREATE INDEX IF NOT EXISTS idx_categories_group_id ON categories(group_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category_id);
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);

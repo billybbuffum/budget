@@ -81,7 +81,7 @@ func (s *CategoryGroupService) UpdateCategoryGroup(ctx context.Context, id, name
 }
 
 // DeleteCategoryGroup deletes a category group
-// Before deletion, it unassigns all categories from this group
+// Returns an error if the group contains any categories
 func (s *CategoryGroupService) DeleteCategoryGroup(ctx context.Context, id string) error {
 	// Get all categories in this group
 	categories, err := s.categoryRepo.ListByGroup(ctx, id)
@@ -89,13 +89,9 @@ func (s *CategoryGroupService) DeleteCategoryGroup(ctx context.Context, id strin
 		return fmt.Errorf("failed to get categories in group: %w", err)
 	}
 
-	// Unassign all categories from this group
-	for _, category := range categories {
-		category.GroupID = nil
-		category.UpdatedAt = time.Now()
-		if err := s.categoryRepo.Update(ctx, category); err != nil {
-			return fmt.Errorf("failed to unassign category %s: %w", category.ID, err)
-		}
+	// Prevent deletion if group contains categories
+	if len(categories) > 0 {
+		return fmt.Errorf("cannot delete category group: it contains %d categories. Please move or delete all categories first", len(categories))
 	}
 
 	// Delete the group
@@ -130,21 +126,8 @@ func (s *CategoryGroupService) AssignCategoryToGroup(ctx context.Context, catego
 	return nil
 }
 
-// UnassignCategoryFromGroup removes a category from its group
+// UnassignCategoryFromGroup is deprecated - categories must always belong to a group
+// This method now returns an error to maintain backward compatibility with existing API
 func (s *CategoryGroupService) UnassignCategoryFromGroup(ctx context.Context, categoryID string) error {
-	// Get the category
-	category, err := s.categoryRepo.GetByID(ctx, categoryID)
-	if err != nil {
-		return fmt.Errorf("category not found: %w", err)
-	}
-
-	// Unassign the category from its group
-	category.GroupID = nil
-	category.UpdatedAt = time.Now()
-
-	if err := s.categoryRepo.Update(ctx, category); err != nil {
-		return fmt.Errorf("failed to unassign category from group: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("categories must belong to a group. Use AssignCategoryToGroup to move this category to a different group")
 }

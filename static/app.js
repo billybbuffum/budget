@@ -219,7 +219,7 @@ async function loadBudgetView() {
             return;
         }
 
-        // Render groups and ungrouped categories
+        // Render category groups
         budgetCategories.innerHTML = renderBudgetWithGroups(summary);
 
         // Initialize drag-and-drop after rendering
@@ -240,10 +240,6 @@ function renderBudgetWithGroups(summary) {
         const groupCategories = categories.filter(c => c.group_id === group.id);
         html += renderGroupSection(group, groupCategories, summary);
     }
-
-    // Always render ungrouped section
-    const ungroupedCategories = categories.filter(c => !c.group_id);
-    html += renderUngroupedSection(ungroupedCategories, summary);
 
     return html;
 }
@@ -279,22 +275,6 @@ function renderGroupSection(group, groupCategories, summary) {
                 ${categoriesHtml}
             </div>
             <button onclick="showAddCategoryInline('${group.id}');" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
-        </div>
-    `;
-}
-
-function renderUngroupedSection(ungroupedCategories, summary) {
-    const categoriesHtml = ungroupedCategories.length > 0
-        ? ungroupedCategories.map(cat => renderBudgetCategory(cat, summary)).join('')
-        : '<div class="text-gray-400 dark:text-gray-500 text-sm p-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded text-center">Drag categories here to ungroup</div>';
-
-    return `
-        <div class="budget-group mb-4" data-group-id="ungrouped">
-            <h3 class="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2 p-2">Ungrouped</h3>
-            <div class="group-categories space-y-2 min-h-[60px]" data-group-id="ungrouped">
-                ${categoriesHtml}
-            </div>
-            <button onclick="showAddCategoryInline(null);" class="mt-2 w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-white/5 rounded px-3 py-2 border border-dashed border-blue-300 dark:border-blue-600 transition">+ Add Category</button>
         </div>
     `;
 }
@@ -390,7 +370,7 @@ function initializeBudgetDragDrop() {
                 onEnd: async function(evt) {
                     const categoryId = evt.item.dataset.categoryId;
                     const newGroupId = evt.to.dataset.groupId;
-                    await updateCategoryGroup(categoryId, newGroupId === 'ungrouped' ? null : newGroupId);
+                    await updateCategoryGroup(categoryId, newGroupId);
                 }
             });
         });
@@ -398,7 +378,7 @@ function initializeBudgetDragDrop() {
 }
 
 async function updateGroupOrder() {
-    const groups = [...document.querySelectorAll('.budget-group[data-group-id]:not([data-group-id="ungrouped"])')];
+    const groups = [...document.querySelectorAll('.budget-group[data-group-id]')];
     for (let i = 0; i < groups.length; i++) {
         const groupId = groups[i].dataset.groupId;
         try {
@@ -414,14 +394,15 @@ async function updateGroupOrder() {
 
 async function updateCategoryGroup(categoryId, groupId) {
     try {
-        if (groupId) {
-            await apiCall('/category-groups/assign', {
-                method: 'POST',
-                body: JSON.stringify({ category_id: categoryId, group_id: groupId })
-            });
-        } else {
-            await apiCall(`/category-groups/unassign/${categoryId}`, { method: 'POST' });
+        if (!groupId) {
+            showToast('Categories must belong to a group', 'error');
+            loadBudgetView(); // Reload to reset UI
+            return;
         }
+        await apiCall('/category-groups/assign', {
+            method: 'POST',
+            body: JSON.stringify({ category_id: categoryId, group_id: groupId })
+        });
         showToast('Category moved successfully!');
     } catch (error) {
         console.error('Failed to update category group:', error);
@@ -452,7 +433,7 @@ async function showAddGroupInline() {
 }
 
 async function deleteGroup(groupId) {
-    if (!confirm('Delete this group? Categories will be moved to Ungrouped.')) return;
+    if (!confirm('Delete this group? You must move or delete all categories in this group first.')) return;
 
     try {
         await apiCall(`/category-groups/${groupId}`, { method: 'DELETE' });
@@ -461,6 +442,7 @@ async function deleteGroup(groupId) {
         showToast('Group deleted successfully!');
     } catch (error) {
         console.error('Failed to delete group:', error);
+        showToast('Cannot delete group: it still contains categories. Please move or delete all categories first.', 'error');
     }
 }
 
@@ -962,6 +944,11 @@ async function startGroupNameEdit(groupId, currentName) {
 
 // Show inline form to add category
 function showAddCategoryInline(groupId) {
+    if (!groupId) {
+        showToast('Cannot add category: group is required', 'error');
+        return;
+    }
+
     const colors = [
         { hex: '#f97316', name: 'Orange' },
         { hex: '#3b82f6', name: 'Blue' },
@@ -983,9 +970,7 @@ function showAddCategoryInline(groupId) {
                  title="${color.name}"></button>`
     ).join('');
 
-    const groupSelector = groupId
-        ? `<input type="hidden" id="inline-category-group" value="${groupId}">`
-        : `<input type="hidden" id="inline-category-group" value="">`;
+    const groupSelector = `<input type="hidden" id="inline-category-group" value="${groupId}">`;
 
     const formHtml = `
         <div id="inline-category-form" class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mt-2">
