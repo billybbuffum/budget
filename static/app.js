@@ -335,9 +335,24 @@ function renderBudgetCategory(category, summary) {
                 onclick="event.stopPropagation(); startInlineEdit('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${allocated})"
                 title="Click to edit">${formatCurrency(allocated)}</div>`;
 
+    const underfundedCategories = summaryItem?.underfunded_categories || [];
+    const categoriesText = underfundedCategories.length > 0
+        ? `<div class="text-red-600 dark:text-red-400 text-xs mt-0.5">Categories: ${underfundedCategories.join(', ')}</div>`
+        : '';
+
     const underfundedWarning = isUnderfunded
         ? `<div class="mt-1 p-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs">
-            <span class="text-red-600 dark:text-red-400 font-medium">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-red-600 dark:text-red-400 font-medium">⚠️ Underfunded - Need ${formatCurrency(summaryItem.underfunded)} more</span>
+                    ${categoriesText}
+                </div>
+                <button onclick="event.stopPropagation(); coverUnderfunded('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${summaryItem.underfunded});"
+                        class="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium no-drag transition-colors"
+                        title="Allocate funds to cover the shortfall">
+                    Allocate to Cover
+                </button>
+            </div>
         </div>` : '';
 
     const deleteButton = isPaymentCategory
@@ -1153,6 +1168,37 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
     input.addEventListener('blur', () => {
         setTimeout(() => saveAllocation(), 100);
     });
+}
+
+// Cover underfunded payment category
+async function coverUnderfunded(categoryId, categoryName, underfundedAmount) {
+    const period = getCurrentPeriod();
+
+    // Confirm with the user
+    const confirmed = confirm(
+        `Allocate ${formatCurrency(underfundedAmount)} to "${categoryName}" to cover the credit card balance?\n\n` +
+        `This will use available funds from Ready to Assign.`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        await apiCall('/allocations/cover-underfunded', {
+            method: 'POST',
+            body: JSON.stringify({
+                category_id: categoryId,
+                period: period
+            })
+        });
+
+        showToast(`Allocated ${formatCurrency(underfundedAmount)} to ${categoryName}!`);
+        loadBudgetView();
+    } catch (error) {
+        console.error('Failed to cover underfunded category:', error);
+        showToast(error.message || 'Failed to allocate funds. Check if you have enough available.', 'error');
+    }
 }
 
 // Inline category name editing

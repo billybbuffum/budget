@@ -145,3 +145,36 @@ func (h *AllocationHandler) DeleteAllocation(w http.ResponseWriter, r *http.Requ
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type CoverUnderfundedRequest struct {
+	CategoryID string `json:"category_id"`
+	Period     string `json:"period"` // YYYY-MM
+}
+
+func (h *AllocationHandler) CoverUnderfunded(w http.ResponseWriter, r *http.Request) {
+	var req CoverUnderfundedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.CategoryID == "" {
+		http.Error(w, "category_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Period == "" {
+		http.Error(w, "period is required", http.StatusBadRequest)
+		return
+	}
+
+	allocation, err := h.allocationService.AllocateToCoverUnderfunded(r.Context(), req.CategoryID, req.Period)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(allocation)
+}
