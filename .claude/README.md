@@ -9,6 +9,7 @@ This directory contains Claude Code customizations for the Budget application, i
 ├── README.md                    # This file
 ├── FEATURE_USAGE_GUIDE.md      # When to use each Claude Code feature
 ├── MCP_RECOMMENDATIONS.md       # Recommended MCP servers to install
+├── WORKFLOWS.md                 # Common development workflows and examples
 ├── agents/                      # Sub agents for specialized tasks
 │   ├── code-reviewer/
 │   ├── test-generator/
@@ -17,6 +18,7 @@ This directory contains Claude Code customizations for the Budget application, i
 │   ├── security-auditor/
 │   └── budget-domain-expert/
 ├── commands/                    # Slash commands for common workflows
+│   ├── implement-spec.md       # 🆕 Orchestrate full spec implementation
 │   ├── new-feature.md
 │   ├── new-endpoint.md
 │   ├── review-pr.md
@@ -86,6 +88,13 @@ Slash commands are reusable workflows for common tasks.
 
 ### Available Commands
 
+- **/implement-spec** `<spec-url>` - 🆕 **Orchestrate complete spec implementation workflow**
+  - Fetches and analyzes specification
+  - Invokes budget-domain-expert for validation
+  - Creates implementation with proper architecture
+  - Generates tests and performs code review
+  - **Start here for implementing requirements!**
+
 - **/new-feature** `<feature-name>` - Scaffold new feature following clean architecture
 - **/new-endpoint** `<description>` - Add new API endpoint
 - **/review-pr** - Review PR with budget app specific checks
@@ -98,10 +107,13 @@ Slash commands are reusable workflows for common tasks.
 
 Type `/` in Claude Code to see available commands, then:
 ```
+/implement-spec https://github.com/.../spec.md
 /new-feature user-authentication
 /test-endpoint /api/accounts
 /review-pr
 ```
+
+**💡 Pro Tip**: Start with `/implement-spec` for most requirements - it orchestrates the entire workflow automatically!
 
 ## 🎯 Skills
 
@@ -160,24 +172,53 @@ Recommended MCP servers to install:
 
 Includes installation instructions and use cases.
 
+### WORKFLOWS.md
+
+Common development workflows with step-by-step examples:
+- Implementing a specification (3 different methods)
+- Creating new features
+- Adding API endpoints
+- Reviewing code
+- Fixing bugs
+- Refactoring safely
+- Testing strategies
+- Deployment procedures
+
+**Start here** to see practical examples of using all the tools together!
+
 ## 🚀 Getting Started
 
 ### 1. Review the Guides
 
 Start by reading:
-1. `FEATURE_USAGE_GUIDE.md` - Understand when to use each feature
-2. `MCP_RECOMMENDATIONS.md` - Install recommended MCPs
+1. `WORKFLOWS.md` - **Start here!** See practical examples
+2. `FEATURE_USAGE_GUIDE.md` - Understand when to use each feature
+3. `MCP_RECOMMENDATIONS.md` - Install recommended MCPs
 
-### 2. Try Slash Commands
+### 2. Try the Orchestration Command
 
-Most immediate value comes from slash commands:
+The fastest way to implement a requirement:
+```
+/implement-spec https://github.com/.../spec.md
+```
+
+This automatically:
+- Fetches and analyzes the spec
+- Invokes budget-domain-expert for validation
+- Creates implementation
+- Generates tests
+- Performs code review
+
+### 3. Try Individual Commands
+
+For specific tasks:
 ```
 /check-architecture
 /test-endpoint /api/accounts
 /review-pr
 ```
 
-### 3. Invoke Sub Agents
+### 4. Invoke Sub Agents
 
 For complex tasks, use sub agents:
 ```
@@ -190,6 +231,22 @@ For complex tasks, use sub agents:
 Skills automatically activate based on context. Just work naturally and they'll help when relevant.
 
 ## 💡 Example Workflows
+
+### Implementing a Specification (Most Common)
+
+```
+/implement-spec https://github.com/billybbuffum/budget/blob/branch/docs/spec.md
+
+→ Claude automatically:
+  1. Fetches and analyzes the specification
+  2. Invokes budget-domain-expert to validate business logic
+  3. Creates implementation following clean architecture
+  4. Invokes test-generator to create comprehensive tests
+  5. Invokes code-reviewer to verify implementation
+  6. Guides you through any remaining steps
+
+Complete workflow in one command!
+```
 
 ### Creating a New Feature
 
