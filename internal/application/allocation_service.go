@@ -363,8 +363,20 @@ func (s *AllocationService) CoverUnderfundedPayment(ctx context.Context, payment
 		return nil, fmt.Errorf("insufficient funds: need %d cents but only %d cents available", underfundedAmount, readyToAssign)
 	}
 
-	// 4. Create allocation
-	allocation, err := s.CreateAllocation(ctx, paymentCategoryID, underfundedAmount, period, "Cover underfunded credit card spending")
+	// 4. Get existing allocation for this period (if any) and add to it
+	// The underfundedAmount is the SHORTFALL (additional amount needed)
+	// We need to ADD this to any existing allocation for the period
+	existingAllocation, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategoryID, period)
+	existingAmount := int64(0)
+	if err == nil && existingAllocation != nil {
+		existingAmount = existingAllocation.Amount
+	}
+
+	// New total = existing + shortfall
+	newTotalAmount := existingAmount + underfundedAmount
+
+	// Create/update allocation with new total
+	allocation, err := s.CreateAllocation(ctx, paymentCategoryID, newTotalAmount, period, "Cover underfunded credit card spending")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create allocation: %w", err)
 	}
