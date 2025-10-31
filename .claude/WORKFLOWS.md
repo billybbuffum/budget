@@ -514,6 +514,66 @@ curl http://localhost:8080/api/accounts
 
 ---
 
+### Test UI Interactively
+
+**Interactive UI testing with Playwright MCP:**
+```
+/test-ui "allocation creation workflow"
+```
+
+**What happens:**
+1. ui-tester agent creates test plan
+2. Uses Playwright MCP to actually open browser
+3. Clicks through UI like a real user
+4. Reports bugs if found
+5. Generates automated tests if all passes
+
+**Example workflow:**
+```
+# Test allocation creation
+/test-ui "create allocation and verify Ready to Assign updates"
+
+→ Opens browser at localhost:8080
+→ Clicks Budget tab
+→ Fills in allocation form
+→ Saves allocation
+→ Verifies Ready to Assign decreases
+→ Reports: "✅ All tests passed" or "❌ Bug found: Save button doesn't work"
+```
+
+**UI Testing vs Test Generation:**
+- **Playwright MCP** (via /test-ui): Actually runs in browser, finds bugs
+- **Test Generation** (test-generator agent): Creates `.spec.ts` files for CI/CD
+
+**Common UI tests:**
+```
+# Test specific workflows
+/test-ui "transaction creation and balance update"
+/test-ui "rollover calculation display"
+/test-ui "credit card payment category auto-creation"
+
+# Test form validation
+/test-ui "allocation form validation with invalid input"
+
+# Test responsive design
+/test-ui "budget page on mobile, tablet, and desktop"
+```
+
+**When UI bugs found:**
+```
+1. /test-ui "feature workflow"
+   → Finds bug: "Save button doesn't work"
+
+2. Fix the bug in code
+
+3. /test-ui "feature workflow"
+   → Verify fix: "✅ All tests pass"
+
+4. Automated tests generated in tests/e2e/
+```
+
+---
+
 ## Deployment
 
 ### Pre-Deployment Checklist

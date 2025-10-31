@@ -79,6 +79,12 @@ Sub agents are specialized AI assistants for complex tasks with isolated context
    - Ensures correct rollover behavior
    - Credit card logic validation
 
+7. **ui-tester** - Interactive UI testing with Playwright MCP
+   - Tests UI workflows in actual browser
+   - Finds UI bugs in real-time
+   - Generates automated Playwright tests
+   - Verifies UI matches specifications
+
 ### Using Sub Agents
 
 In conversation with Claude, reference agents like:
@@ -117,6 +123,7 @@ Slash commands are reusable workflows for common tasks.
 - **/review-pr** - Review PR with budget app specific checks
 - **/check-architecture** - Verify clean architecture compliance
 - **/test-endpoint** `<path>` - Test API endpoint with curl
+- **/test-ui** `<workflow-description>` - Test UI interactively with Playwright MCP
 - **/run-tests** - Run all tests and report results
 - **/generate-docs** - Generate comprehensive API documentation
 
@@ -358,6 +365,20 @@ Then:
   3. Tests error cases
   4. Validates responses
   5. Reports results
+```
+
+### Testing UI Interactively
+
+```
+/test-ui "allocation creation workflow"
+
+→ Claude with ui-tester agent:
+  1. Creates test plan
+  2. Uses Playwright MCP to open browser
+  3. Tests workflow like a real user
+  4. Reports bugs if found
+  5. Generates automated tests if all passes
+  6. Test files ready for CI/CD
 ```
 
 ## 🎓 Learning Path

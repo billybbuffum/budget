@@ -78,7 +78,84 @@ claude mcp add github --scope user
 
 ---
 
-#### 2. **PostgreSQL MCP Server** (Future Migration)
+#### 2. **Playwright MCP Server** (UI Testing)
+
+**Why You Need It:**
+- Interactively test UI during development
+- Actually opens browser and runs through workflows
+- Find UI bugs in real-time
+- Verify user workflows work correctly
+- Debug UI issues with live browser
+- Generate automated test code from successful tests
+
+**Use Cases for Budget App:**
+- Test allocation creation workflow interactively
+- Verify transaction forms work correctly
+- Test budget summary display and calculations
+- Verify Ready to Assign updates in real-time
+- Test category selection and amount entry
+- Debug JavaScript errors with live browser
+- Explore UI edge cases interactively
+- Generate Playwright test files for CI/CD
+
+**Installation:**
+```bash
+npm install -g @playwright/test @modelcontextprotocol/server-playwright
+claude mcp add playwright --scope user
+```
+
+**Configuration:** `~/.claude/mcp.json`
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-playwright"]
+      }
+    }
+  }
+}
+```
+
+**Features:**
+- Open browser (Chrome, Firefox, Safari)
+- Navigate to pages
+- Click buttons and links
+- Fill forms
+- Take screenshots
+- Verify text and elements
+- Wait for conditions
+- Get actual test results
+- Generate test code
+
+**Example Usage:**
+```
+"Use Playwright MCP to test the allocation workflow:
+1. Navigate to http://localhost:8080
+2. Click on Budget tab
+3. Select 'Groceries' category
+4. Enter amount: 500
+5. Click Save button
+6. Verify success message appears"
+
+→ Actually opens browser
+→ Performs each step
+→ Reports: "✅ Test passed" or "❌ Bug found: Save button doesn't work"
+```
+
+**Key Difference from Test Generation:**
+- **Playwright MCP**: Actually runs tests in browser (interactive, during development)
+- **Test Generation**: Creates `.spec.ts` files (automated, for CI/CD)
+
+**Workflow:**
+1. Use Playwright MCP to test interactively → Find and fix bugs
+2. Once working, generate test code → Automated regression tests
+
+---
+
+#### 3. **PostgreSQL MCP Server** (Future Migration)
 
 **Why You Need It:**
 - Currently using SQLite, but may need PostgreSQL for production
@@ -409,8 +486,9 @@ claude mcp add web-search --scope user
 
 ### 🔴 Priority 1: Install Now
 - **GitHub**: Essential for code management
-- **PostgreSQL**: Important for future production use
+- **Playwright**: Critical for UI testing and validation
 - **Sentry**: Critical for production monitoring
+- **PostgreSQL**: Important for future production use
 
 ### 🟡 Priority 2: Install Soon
 - **Filesystem**: Better file operations
