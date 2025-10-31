@@ -39,6 +39,7 @@ type SuggestionWithDetails struct {
 	Confidence      string                  `json:"confidence"`
 	Score           int                     `json:"score"`
 	IsCreditPayment bool                    `json:"is_credit_payment"`
+	Status          string                  `json:"status"`
 	CreatedAt       string                  `json:"created_at"`
 }
 
@@ -99,6 +100,7 @@ func (h *TransferSuggestionHandler) ListSuggestions(w http.ResponseWriter, r *ht
 			Confidence:      suggestion.Confidence,
 			Score:           suggestion.Score,
 			IsCreditPayment: suggestion.IsCreditPayment,
+			Status:          suggestion.Status,
 			CreatedAt:       suggestion.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}

@@ -59,6 +59,12 @@ var migrations = []Migration{
 		Up:          migrateRequireGroupID,
 		Down:        rollbackRequireGroupID,
 	},
+	{
+		Version:     "008_add_transfer_matching",
+		Description: "Add transfer_match_suggestions table and indexes for transaction linking",
+		Up:          migrateAddTransferMatching,
+		Down:        rollbackAddTransferMatching,
+	},
 }
 
 // migrateCategoryIDNullable makes the category_id column nullable in transactions table
@@ -953,6 +959,90 @@ func rollbackRequireGroupID(db *sql.DB) error {
 	_, err = tx.Exec("CREATE INDEX idx_categories_group_id ON categories(group_id)")
 	if err != nil {
 		return fmt.Errorf("failed to create index on group_id: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// migrateAddTransferMatching creates the transfer_match_suggestions table and indexes
+func migrateAddTransferMatching(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Create transfer_match_suggestions table
+	_, err = tx.Exec(`
+		CREATE TABLE IF NOT EXISTS transfer_match_suggestions (
+			id TEXT PRIMARY KEY,
+			transaction_a_id TEXT NOT NULL,
+			transaction_b_id TEXT NOT NULL,
+			confidence TEXT NOT NULL CHECK(confidence IN ('high', 'medium', 'low')),
+			score INTEGER NOT NULL,
+			is_credit_payment BOOLEAN NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected')),
+			created_at DATETIME NOT NULL,
+			reviewed_at DATETIME,
+			FOREIGN KEY (transaction_a_id) REFERENCES transactions(id) ON DELETE CASCADE,
+			FOREIGN KEY (transaction_b_id) REFERENCES transactions(id) ON DELETE CASCADE,
+			UNIQUE(transaction_a_id, transaction_b_id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create transfer_match_suggestions table: %w", err)
+	}
+
+	// Create indexes for transfer_match_suggestions
+	_, err = tx.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_transfer_suggestions_status ON transfer_match_suggestions(status);
+		CREATE INDEX IF NOT EXISTS idx_transfer_suggestions_confidence ON transfer_match_suggestions(confidence);
+		CREATE INDEX IF NOT EXISTS idx_transfer_suggestions_credit ON transfer_match_suggestions(is_credit_payment);
+		CREATE INDEX IF NOT EXISTS idx_transfer_suggestions_txn_a ON transfer_match_suggestions(transaction_a_id);
+		CREATE INDEX IF NOT EXISTS idx_transfer_suggestions_txn_b ON transfer_match_suggestions(transaction_b_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create suggestion indexes: %w", err)
+	}
+
+	// Create performance index for matching algorithm
+	_, err = tx.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_transactions_matching ON transactions(type, amount, date)
+		WHERE transfer_to_account_id IS NULL
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create matching index: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// rollbackAddTransferMatching removes the transfer_match_suggestions table and indexes
+func rollbackAddTransferMatching(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Drop transfer_match_suggestions table
+	_, err = tx.Exec("DROP TABLE IF EXISTS transfer_match_suggestions")
+	if err != nil {
+		return fmt.Errorf("failed to drop transfer_match_suggestions table: %w", err)
+	}
+
+	// Drop the matching index
+	_, err = tx.Exec("DROP INDEX IF EXISTS idx_transactions_matching")
+	if err != nil {
+		return fmt.Errorf("failed to drop matching index: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
