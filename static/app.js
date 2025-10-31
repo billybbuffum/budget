@@ -2147,6 +2147,210 @@ window.closeImportView = closeImportView;
 // END NEW SIDEBAR AND PANEL FUNCTIONS
 // ============================================================================
 
+// ============================================================================
+// TRANSFER SUGGESTIONS FUNCTIONS
+// ============================================================================
+
+let transferSuggestions = [];
+
+// Load transfer suggestions
+async function loadTransferSuggestions() {
+    try {
+        const data = await apiCall('/transfer-suggestions/pending');
+        transferSuggestions = data || [];
+        renderTransferSuggestions();
+    } catch (error) {
+        console.error('Failed to load transfer suggestions:', error);
+    }
+}
+
+// Render transfer suggestions in sidebar
+function renderTransferSuggestions() {
+    const section = document.getElementById('transfer-suggestions-section');
+    const list = document.getElementById('sidebar-suggestions-list');
+    const count = document.getElementById('suggestions-count');
+
+    if (!section || !list || !count) return;
+
+    // Show/hide section based on suggestions count
+    if (transferSuggestions.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    count.textContent = transferSuggestions.length;
+
+    // Render suggestions (show first 5)
+    const suggestionsToShow = transferSuggestions.slice(0, 5);
+    list.innerHTML = suggestionsToShow.map(suggestion => {
+        const txnA = suggestion.transaction_a;
+        const txnB = suggestion.transaction_b;
+        const accountA = accounts.find(a => a.id === txnA.account_id);
+        const accountB = accounts.find(a => a.id === txnB.account_id);
+
+        const confidenceBadge = {
+            high: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            low: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+        }[suggestion.confidence] || '';
+
+        return `
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs px-2 py-0.5 rounded ${confidenceBadge}">${suggestion.confidence.toUpperCase()}</span>
+                    ${suggestion.is_credit_payment ? '<span class="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded">CC Payment</span>' : ''}
+                </div>
+                <div class="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <div class="flex justify-between mb-1">
+                        <span class="font-medium">${accountA?.name || 'Unknown'}</span>
+                        <span class="text-red-600 dark:text-red-400">${formatCurrency(txnA.amount)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium">${accountB?.name || 'Unknown'}</span>
+                        <span class="text-green-600 dark:text-green-400">${formatCurrency(txnB.amount)}</span>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">${formatDate(txnA.date)}</div>
+                <div class="flex gap-2">
+                    <button onclick="acceptSuggestion('${suggestion.id}')" class="flex-1 text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
+                        Link
+                    </button>
+                    <button onclick="rejectSuggestion('${suggestion.id}')" class="flex-1 text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">
+                        Skip
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Accept a transfer suggestion
+async function acceptSuggestion(suggestionId) {
+    try {
+        await apiCall(`/transfer-suggestions/${suggestionId}/accept`, {
+            method: 'POST'
+        });
+        showToast('Transactions linked successfully!', 'success');
+        await loadTransferSuggestions();
+        await loadTransactions();
+        await loadSidebar();
+    } catch (error) {
+        console.error('Failed to accept suggestion:', error);
+        showToast('Failed to link transactions: ' + error.message, 'error');
+    }
+}
+
+// Reject a transfer suggestion
+async function rejectSuggestion(suggestionId) {
+    try {
+        await apiCall(`/transfer-suggestions/${suggestionId}/reject`, {
+            method: 'POST'
+        });
+        showToast('Suggestion dismissed', 'success');
+        await loadTransferSuggestions();
+    } catch (error) {
+        console.error('Failed to reject suggestion:', error);
+        showToast('Failed to dismiss suggestion: ' + error.message, 'error');
+    }
+}
+
+// View all suggestions (opens transaction panel)
+function viewAllSuggestions() {
+    const panel = document.getElementById('transaction-panel');
+    const backdrop = document.getElementById('transaction-panel-backdrop');
+    const title = document.getElementById('transaction-panel-title');
+    const subtitle = document.getElementById('transaction-panel-subtitle');
+    const content = document.getElementById('transaction-panel-content');
+
+    if (!panel || !backdrop || !title || !subtitle || !content) return;
+
+    title.textContent = 'Transfer Match Suggestions';
+    subtitle.textContent = `${transferSuggestions.length} potential matches found`;
+
+    const html = transferSuggestions.length === 0 ? `
+        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+            No transfer suggestions at this time.
+        </div>
+    ` : transferSuggestions.map(suggestion => {
+        const txnA = suggestion.transaction_a;
+        const txnB = suggestion.transaction_b;
+        const accountA = accounts.find(a => a.id === txnA.account_id);
+        const accountB = accounts.find(a => a.id === txnB.account_id);
+
+        const confidenceBadge = {
+            high: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            low: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+        }[suggestion.confidence] || '';
+
+        return `
+            <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex gap-2">
+                        <span class="text-xs px-2 py-0.5 rounded ${confidenceBadge}">${suggestion.confidence.toUpperCase()} (${suggestion.match_score} pts)</span>
+                        ${suggestion.is_credit_payment ? '<span class="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded">CC Payment</span>' : ''}
+                    </div>
+                </div>
+
+                <div class="space-y-3 mb-4">
+                    <div class="bg-gray-50 dark:bg-gray-900/50 rounded p-3">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">FROM</div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-semibold text-gray-900 dark:text-gray-100">${accountA?.name || 'Unknown'}</div>
+                                <div class="text-sm text-gray-600 dark:text-gray-400">${txnA.description || 'No description'}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">${formatDate(txnA.date)}</div>
+                            </div>
+                            <div class="text-lg font-bold text-red-600 dark:text-red-400">${formatCurrency(txnA.amount)}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-center">
+                        <span class="text-2xl">↓</span>
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-900/50 rounded p-3">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">TO</div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-semibold text-gray-900 dark:text-gray-100">${accountB?.name || 'Unknown'}</div>
+                                <div class="text-sm text-gray-600 dark:text-gray-400">${txnB.description || 'No description'}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">${formatDate(txnB.date)}</div>
+                            </div>
+                            <div class="text-lg font-bold text-green-600 dark:text-green-400">${formatCurrency(txnB.amount)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="acceptSuggestion('${suggestion.id}')" class="flex-1 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                        Link as Transfer
+                    </button>
+                    <button onclick="rejectSuggestion('${suggestion.id}')" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                        Not a Match
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    content.innerHTML = html;
+
+    // Show panel
+    panel.classList.remove('translate-x-full');
+    backdrop.classList.remove('hidden');
+}
+
+// Make functions globally available
+window.acceptSuggestion = acceptSuggestion;
+window.rejectSuggestion = rejectSuggestion;
+window.viewAllSuggestions = viewAllSuggestions;
+
+// ============================================================================
+// END TRANSFER SUGGESTIONS FUNCTIONS
+// ============================================================================
+
 // Initialize the app
 async function init() {
     try {
@@ -2154,6 +2358,7 @@ async function init() {
         await loadCategories();
         await loadBudgetView();
         await loadSidebar(); // Load sidebar data
+        await loadTransferSuggestions(); // Load transfer suggestions
 
         // Show helpful message if starting fresh
         if (accounts.length === 0 && categories.length === 0) {

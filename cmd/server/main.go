@@ -41,6 +41,7 @@ func main() {
 	transactionRepo := repository.NewTransactionRepository(db)
 	allocationRepo := repository.NewAllocationRepository(db)
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
+	transferSuggestionRepo := repository.NewTransferSuggestionRepository(db)
 
 	// Initialize default data
 	bootstrapService := application.NewBootstrapService(categoryGroupRepo, categoryRepo)
@@ -59,7 +60,11 @@ func main() {
 	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo, transactionRepo, categoryGroupService)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, allocationRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo, accountRepo)
-	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser)
+
+	// Initialize transfer services
+	transferMatcherService := application.NewTransferMatcherService(transactionRepo, accountRepo, transferSuggestionRepo)
+	transferLinkService := application.NewTransferLinkService(transactionRepo, accountRepo, categoryRepo, allocationRepo, transferSuggestionRepo)
+	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser, transferMatcherService)
 
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)
@@ -68,9 +73,10 @@ func main() {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	allocationHandler := handlers.NewAllocationHandler(allocationService)
 	importHandler := handlers.NewImportHandler(importService)
+	transferSuggestionHandler := handlers.NewTransferSuggestionHandler(transferLinkService, transferSuggestionRepo, transactionRepo)
 
 	// Setup router
-	router := http.NewRouter(accountHandler, categoryHandler, categoryGroupHandler, transactionHandler, allocationHandler, importHandler)
+	router := http.NewRouter(accountHandler, categoryHandler, categoryGroupHandler, transactionHandler, allocationHandler, importHandler, transferSuggestionHandler)
 
 	// Create server
 	server := http.NewServer(fmt.Sprintf(":%s", cfg.Server.Port), router)
