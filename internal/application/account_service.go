@@ -14,15 +14,17 @@ type AccountService struct {
 	accountRepo          domain.AccountRepository
 	categoryRepo         domain.CategoryRepository
 	budgetStateRepo      domain.BudgetStateRepository
+	transactionRepo      domain.TransactionRepository
 	categoryGroupService *CategoryGroupService
 }
 
 // NewAccountService creates a new account service
-func NewAccountService(accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, budgetStateRepo domain.BudgetStateRepository, categoryGroupService *CategoryGroupService) *AccountService {
+func NewAccountService(accountRepo domain.AccountRepository, categoryRepo domain.CategoryRepository, budgetStateRepo domain.BudgetStateRepository, transactionRepo domain.TransactionRepository, categoryGroupService *CategoryGroupService) *AccountService {
 	return &AccountService{
 		accountRepo:          accountRepo,
 		categoryRepo:         categoryRepo,
 		budgetStateRepo:      budgetStateRepo,
+		transactionRepo:      transactionRepo,
 		categoryGroupService: categoryGroupService,
 	}
 }
@@ -80,24 +82,43 @@ func (s *AccountService) CreateAccount(ctx context.Context, name string, balance
 			return nil, fmt.Errorf("failed to create payment category: %w", err)
 		}
 
-		// For credit cards with negative balance (existing debt), that money needs to be budgeted
-		// to pay it off. We DON'T increase Ready to Assign (there's no new money),
-		// but we also don't decrease it (the debt already existed).
-		// If balance is positive (credit - you overpaid), increase Ready to Assign
+		// For credit cards with negative balance (existing debt), no income transaction is created
+		// because debt is not income. For positive balance (overpayment credit), create an income transaction.
 		if balance > 0 {
-			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
+			transaction := &domain.Transaction{
+				ID:          uuid.New().String(),
+				AccountID:   account.ID,
+				Amount:      balance,
+				Description: "Starting balance",
+				Date:        time.Now(),
+				Type:        "normal",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			}
+			if err := s.transactionRepo.Create(ctx, transaction); err != nil {
 				s.categoryRepo.Delete(ctx, paymentCategory.ID)
 				s.accountRepo.Delete(ctx, account.ID)
-				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+				return nil, fmt.Errorf("failed to create starting balance transaction: %w", err)
 			}
 		}
 	} else {
-		// For non-credit accounts, balance goes to Ready to Assign
+		// For non-credit accounts, create an income transaction for the starting balance
+		// This ensures the balance shows up in Ready to Assign (Total Inflows - Allocated)
 		if balance != 0 {
-			if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balance); err != nil {
-				// Rollback account creation if Ready to Assign update fails
+			transaction := &domain.Transaction{
+				ID:          uuid.New().String(),
+				AccountID:   account.ID,
+				Amount:      balance,
+				Description: "Starting balance",
+				Date:        time.Now(),
+				Type:        "normal",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			}
+			if err := s.transactionRepo.Create(ctx, transaction); err != nil {
+				// Rollback account creation if transaction creation fails
 				s.accountRepo.Delete(ctx, account.ID)
-				return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+				return nil, fmt.Errorf("failed to create starting balance transaction: %w", err)
 			}
 		}
 	}
@@ -149,11 +170,21 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id, name string, bal
 		return nil, err
 	}
 
-	// Adjust Ready to Assign by the balance delta
-	// If balance increased, increase Ready to Assign; if decreased, decrease it
+	// If balance changed, create an adjustment transaction
+	// This ensures the RTA calculation (Total Inflows - Allocated) reflects the change
 	if balanceDelta != 0 {
-		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, balanceDelta); err != nil {
-			return nil, fmt.Errorf("failed to adjust ready to assign: %w", err)
+		transaction := &domain.Transaction{
+			ID:          uuid.New().String(),
+			AccountID:   account.ID,
+			Amount:      balanceDelta,
+			Description: "Balance adjustment",
+			Date:        time.Now(),
+			Type:        "normal",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := s.transactionRepo.Create(ctx, transaction); err != nil {
+			return nil, fmt.Errorf("failed to create balance adjustment transaction: %w", err)
 		}
 	}
 
@@ -182,16 +213,10 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
 	}
 
 	// Delete the account
+	// Note: Transactions will be cascade-deleted by the database foreign key constraint
+	// This automatically removes the account's transactions from RTA calculation
 	if err := s.accountRepo.Delete(ctx, id); err != nil {
 		return err
-	}
-
-	// Subtract the account balance from Ready to Assign
-	// This represents money that no longer exists in any account
-	if account.Balance != 0 {
-		if err := s.budgetStateRepo.AdjustReadyToAssign(ctx, -account.Balance); err != nil {
-			return fmt.Errorf("failed to adjust ready to assign: %w", err)
-		}
 	}
 
 	// For credit cards, cleanup the group if it's now empty
