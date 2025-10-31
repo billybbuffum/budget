@@ -2008,8 +2008,77 @@ async function loadSidebar() {
     await renderRecentTransactions();
 }
 
+// Track selected transactions for manual linking
+let selectedTransactionsForLinking = [];
+
+// Toggle transaction selection for linking
+function toggleTransactionSelection(txnId, checkbox) {
+    if (checkbox.checked) {
+        if (!selectedTransactionsForLinking.includes(txnId)) {
+            selectedTransactionsForLinking.push(txnId);
+        }
+    } else {
+        selectedTransactionsForLinking = selectedTransactionsForLinking.filter(id => id !== txnId);
+    }
+    updateLinkButton();
+}
+
+// Update the link button visibility and state
+function updateLinkButton() {
+    const linkBtn = document.getElementById('link-transactions-btn');
+    if (!linkBtn) return;
+
+    if (selectedTransactionsForLinking.length === 2) {
+        linkBtn.classList.remove('hidden');
+        linkBtn.textContent = `Link ${selectedTransactionsForLinking.length} Transactions as Transfer`;
+    } else if (selectedTransactionsForLinking.length > 0) {
+        linkBtn.classList.remove('hidden');
+        linkBtn.textContent = `Select exactly 2 transactions (${selectedTransactionsForLinking.length} selected)`;
+        linkBtn.disabled = true;
+    } else {
+        linkBtn.classList.add('hidden');
+    }
+}
+
+// Link selected transactions manually
+async function linkSelectedTransactions() {
+    if (selectedTransactionsForLinking.length !== 2) {
+        showToast('Please select exactly 2 transactions to link', 'error');
+        return;
+    }
+
+    try {
+        await apiCall('/transactions/link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                transaction_a_id: selectedTransactionsForLinking[0],
+                transaction_b_id: selectedTransactionsForLinking[1]
+            })
+        });
+
+        showToast('Transactions linked successfully!', 'success');
+        selectedTransactionsForLinking = [];
+
+        // Reload the current view
+        if (currentTransactionAccountId) {
+            await loadAccountTransactionsPanel(currentTransactionAccountId);
+        }
+        await loadSidebar();
+        await loadBudgetView();
+    } catch (error) {
+        showToast(`Failed to link transactions: ${error.message}`, 'error');
+    }
+}
+
+// Track current account for reload
+let currentTransactionAccountId = null;
+
 // Open transaction panel for account
 async function loadAccountTransactionsPanel(accountId) {
+    currentTransactionAccountId = accountId;
+    selectedTransactionsForLinking = [];
+
     const panel = document.getElementById('transaction-panel');
     const backdrop = document.getElementById('transaction-panel-backdrop');
     const content = document.getElementById('transaction-panel-content');
@@ -2046,7 +2115,14 @@ async function loadAccountTransactionsPanel(accountId) {
         if (transactions.length === 0) {
             content.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No transactions yet</p>';
         } else {
-            let html = '<div class="space-y-2">';
+            let html = `
+                <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div class="text-sm text-blue-800 dark:text-blue-300">
+                        💡 <strong>Manual Linking:</strong> Select two transactions below to link them as a transfer between accounts.
+                    </div>
+                </div>
+                <div class="space-y-2">
+            `;
 
             transactions.forEach(txn => {
                 const account = accounts.find(a => a.id === txn.account_id);
@@ -2066,27 +2142,48 @@ async function loadAccountTransactionsPanel(accountId) {
                     }
                 }
 
+                // Don't show checkbox for already linked transfers
+                const showCheckbox = !isTransfer;
+
                 html += `
                     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <div class="flex justify-between items-start mb-1">
-                            <div class="font-medium text-gray-900 dark:text-gray-100">${displayText}</div>
-                            <div class="text-lg font-semibold ${amountClass}">${formatCurrency(txn.amount)}</div>
-                        </div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
-                            <div>${formatDate(txn.date)}</div>
-                            ${accountId ? '' : `<div>Account: ${account ? account.name : 'Unknown'}</div>`}
-                            ${category ? `
-                                <div class="flex items-center gap-1">
-                                    <span class="w-3 h-3 rounded-full" style="background-color: ${category.color}"></span>
-                                    <span>${category.name}</span>
+                        <div class="flex items-start gap-3">
+                            ${showCheckbox ? `
+                                <input type="checkbox"
+                                    id="txn-${txn.id}"
+                                    onchange="toggleTransactionSelection('${txn.id}', this)"
+                                    class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            ` : '<div class="w-4"></div>'}
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start mb-1">
+                                    <div class="font-medium text-gray-900 dark:text-gray-100">${displayText}</div>
+                                    <div class="text-lg font-semibold ${amountClass}">${formatCurrency(txn.amount)}</div>
                                 </div>
-                            ` : '<div class="text-yellow-600 dark:text-yellow-400">Uncategorized</div>'}
+                                <div class="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
+                                    <div>${formatDate(txn.date)}</div>
+                                    ${accountId ? '' : `<div>Account: ${account ? account.name : 'Unknown'}</div>`}
+                                    ${category ? `
+                                        <div class="flex items-center gap-1">
+                                            <span class="w-3 h-3 rounded-full" style="background-color: ${category.color}"></span>
+                                            <span>${category.name}</span>
+                                        </div>
+                                    ` : (!isTransfer ? '<div class="text-yellow-600 dark:text-yellow-400">Uncategorized</div>' : '')}
+                                    ${isTransfer ? '<div class="text-blue-600 dark:text-blue-400">🔗 Linked Transfer</div>' : ''}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
             });
 
-            html += '</div>';
+            html += `
+                </div>
+                <button id="link-transactions-btn"
+                    onclick="linkSelectedTransactions()"
+                    class="hidden fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full shadow-lg font-medium z-50">
+                    Link 2 Transactions as Transfer
+                </button>
+            `;
             content.innerHTML = html;
         }
 
@@ -2107,6 +2204,8 @@ function closeTransactionPanel() {
     if (panel && backdrop) {
         panel.classList.add('translate-x-full');
         backdrop.classList.add('hidden');
+        selectedTransactionsForLinking = [];
+        currentTransactionAccountId = null;
     }
 }
 
@@ -2142,6 +2241,8 @@ window.loadAccountTransactionsPanel = loadAccountTransactionsPanel;
 window.closeTransactionPanel = closeTransactionPanel;
 window.showImportView = showImportView;
 window.closeImportView = closeImportView;
+window.toggleTransactionSelection = toggleTransactionSelection;
+window.linkSelectedTransactions = linkSelectedTransactions;
 
 // ============================================================================
 // END NEW SIDEBAR AND PANEL FUNCTIONS

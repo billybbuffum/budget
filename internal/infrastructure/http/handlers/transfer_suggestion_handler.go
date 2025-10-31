@@ -127,20 +127,11 @@ func (h *TransferSuggestionHandler) AcceptSuggestion(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Get the suggestion to return linked transactions
-	suggestion, err := h.suggestionRepo.GetByID(ctx, suggestionID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	txnA, _ := h.transactionRepo.GetByID(ctx, suggestion.TransactionAID)
-	txnB, _ := h.transactionRepo.GetByID(ctx, suggestion.TransactionBID)
-
+	// Return success immediately - suggestion may have been deleted after acceptance
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"linked_transactions": []*domain.Transaction{txnA, txnB},
+		"message": "Transactions linked successfully",
 	})
 }
 
