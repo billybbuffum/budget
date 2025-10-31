@@ -663,25 +663,15 @@ async function saveInlineCategory() {
     try {
         const categoryData = {
             name,
+            group_id: groupId,
             color,
             description: ''
         };
 
-        const newCategory = await apiCall('/categories', {
+        await apiCall('/categories', {
             method: 'POST',
             body: JSON.stringify(categoryData)
         });
-
-        // Assign category to group
-        if (newCategory.id) {
-            await apiCall('/category-groups/assign', {
-                method: 'POST',
-                body: JSON.stringify({
-                    category_id: newCategory.id,
-                    group_id: groupId
-                })
-            });
-        }
 
         showToast('Category added!');
         cancelInlineCategory();
@@ -1008,6 +998,17 @@ function showAddCategoryModal() {
         defaultSwatch.querySelector('.color-check').classList.remove('hidden');
     }
     document.getElementById('category-color').value = '#3b82f6';
+
+    // Populate group dropdown
+    const groupSelect = document.getElementById('category-group');
+    groupSelect.innerHTML = '<option value="">Select group...</option>';
+    categoryGroups.forEach(group => {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.name;
+        groupSelect.appendChild(option);
+    });
+
     showModal('category-modal');
 }
 
@@ -1659,6 +1660,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         const name = document.getElementById('category-name').value;
+        const groupId = document.getElementById('category-group').value;
         const color = document.getElementById('category-color').value;
         const description = document.getElementById('category-description').value;
 
@@ -1667,6 +1669,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: JSON.stringify({
                     name,
+                    group_id: groupId,
                     color,
                     description
                 })
