@@ -269,7 +269,7 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 
 		var totalAllocated int64
 		for _, alloc := range allAllocations {
-			if alloc.CategoryID == category.ID {
+			if alloc.CategoryID == category.ID && alloc.Period <= period {
 				totalAllocated += alloc.Amount
 			}
 		}
@@ -282,10 +282,11 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 
 		var totalSpent int64
 		for _, txn := range allTransactions {
+			txnPeriod := txn.Date.Format("2006-01")
 			// For category-specific available: COUNT all spending including transfers
 			// Transfers DO reduce what's available in a specific category
 			// (This is different from Ready to Assign, which excludes transfers)
-			if txn.Amount < 0 {
+			if txn.Amount < 0 && txnPeriod <= period {
 				totalSpent += -txn.Amount // Convert to positive for display
 			}
 		}
@@ -318,7 +319,8 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 						categoryNames := make(map[string]string)
 
 						for _, txn := range ccTransactions {
-							if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 {
+							txnPeriod := txn.Date.Format("2006-01")
+							if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 && txnPeriod <= period {
 								// This is spending on an expense category
 								categorySpending[*txn.CategoryID] += -txn.Amount // Convert to positive
 
@@ -339,7 +341,7 @@ func (s *AllocationService) GetAllocationSummary(ctx context.Context, period str
 							if err == nil {
 								var catTotalAllocated int64
 								for _, alloc := range allAllocForCat {
-									if alloc.CategoryID == catID {
+									if alloc.CategoryID == catID && alloc.Period <= period {
 										catTotalAllocated += alloc.Amount
 									}
 								}
