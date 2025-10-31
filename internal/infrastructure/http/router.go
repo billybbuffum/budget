@@ -69,6 +69,7 @@ func NewRouter(
 	mux.HandleFunc("GET /api/allocations", allocationHandler.ListAllocations)
 	mux.HandleFunc("GET /api/allocations/summary", allocationHandler.GetAllocationSummary)
 	mux.HandleFunc("GET /api/allocations/ready-to-assign", allocationHandler.GetReadyToAssign)
+	mux.HandleFunc("POST /api/allocations/cover-underfunded", allocationHandler.CoverUnderfunded)
 	mux.HandleFunc("GET /api/allocations/{id}", allocationHandler.GetAllocation)
 	mux.HandleFunc("DELETE /api/allocations/{id}", allocationHandler.DeleteAllocation)
 

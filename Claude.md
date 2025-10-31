@@ -186,6 +186,7 @@ The core concept: Every dollar should be allocated to a category, leaving zero u
 - `GET /api/allocations` - List all allocations
 - `GET /api/allocations/summary?period=YYYY-MM` - Get allocation summary for period
 - `GET /api/allocations/ready-to-assign` - Get amount available to allocate
+- `POST /api/allocations/cover-underfunded` - Manually allocate to cover underfunded credit card
 - `GET /api/allocations/{id}` - Get allocation by ID
 - `DELETE /api/allocations/{id}` - Delete allocation
 

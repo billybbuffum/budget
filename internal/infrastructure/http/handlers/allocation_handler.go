@@ -145,3 +145,52 @@ func (h *AllocationHandler) DeleteAllocation(w http.ResponseWriter, r *http.Requ
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+type CoverUnderfundedRequest struct {
+	PaymentCategoryID string `json:"payment_category_id"`
+	Period            string `json:"period"` // YYYY-MM
+}
+
+func (h *AllocationHandler) CoverUnderfunded(w http.ResponseWriter, r *http.Request) {
+	var req CoverUnderfundedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.PaymentCategoryID == "" {
+		http.Error(w, "payment_category_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Period == "" {
+		http.Error(w, "period is required", http.StatusBadRequest)
+		return
+	}
+
+	allocation, err := h.allocationService.CoverUnderfundedPayment(r.Context(), req.PaymentCategoryID, req.Period)
+	if err != nil {
+		// Check for specific error types
+		errMsg := err.Error()
+		if errMsg == "payment category is not underfunded" {
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return
+		}
+		if errMsg == "category is not a payment category" {
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return
+		}
+		// Insufficient funds error
+		if len(errMsg) > 17 && errMsg[:17] == "insufficient funds" {
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return
+		}
+		// Default to bad request for other errors
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(allocation)
+}
