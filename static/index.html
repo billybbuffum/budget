@@ -19,6 +19,10 @@
             <h1 class="text-2xl font-bold text-blue-600 dark:text-blue-400">🐷 Piggy Bank Pals</h1>
             <div class="flex gap-2">
                 <button onclick="showImportView()" class="btn-secondary">Import</button>
+                <button onclick="showTransferSuggestionsView()" class="btn-secondary relative">
+                    Transfer Suggestions
+                    <span id="suggestions-badge" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 hidden"></span>
+                </button>
                 <button id="theme-toggle" onclick="toggleTheme()" class="btn-secondary" title="Toggle dark mode">
                     <span id="theme-icon">🌙</span>
                 </button>
@@ -154,6 +158,29 @@
 
                     <button type="submit" class="btn-primary">Import Transactions</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Suggestions Modal -->
+    <div id="suggestions-modal" class="modal" onclick="if(event.target === this) closeSuggestionsView()">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Transfer Suggestions</h2>
+                <button onclick="closeSuggestionsView()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl font-bold">&times;</button>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 dark:text-gray-400">The following transactions may be transfers between your accounts. Review and link them to exclude from budget calculations.</p>
+            </div>
+
+            <div id="suggestions-list" class="space-y-4">
+                <!-- Suggestions will be loaded here -->
+            </div>
+
+            <div id="suggestions-empty" class="text-center py-8 text-gray-500 dark:text-gray-400 hidden">
+                <p class="text-lg mb-2">✅ No pending transfer suggestions</p>
+                <p class="text-sm">All imported transactions have been reviewed.</p>
             </div>
         </div>
     </div>

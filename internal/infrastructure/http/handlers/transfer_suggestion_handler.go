@@ -6,7 +6,6 @@ import (
 
 	"github.com/billybbuffum/budget/internal/application"
 	"github.com/billybbuffum/budget/internal/domain"
-	"github.com/gorilla/mux"
 )
 
 type TransferSuggestionHandler struct {
@@ -113,8 +112,7 @@ func (h *TransferSuggestionHandler) ListSuggestions(w http.ResponseWriter, r *ht
 // AcceptSuggestion accepts a suggestion and links the transactions
 func (h *TransferSuggestionHandler) AcceptSuggestion(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	vars := mux.Vars(r)
-	suggestionID := vars["id"]
+	suggestionID := r.PathValue("id")
 
 	if suggestionID == "" {
 		http.Error(w, "suggestion ID is required", http.StatusBadRequest)
@@ -147,8 +145,7 @@ func (h *TransferSuggestionHandler) AcceptSuggestion(w http.ResponseWriter, r *h
 // RejectSuggestion rejects a suggestion
 func (h *TransferSuggestionHandler) RejectSuggestion(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	vars := mux.Vars(r)
-	suggestionID := vars["id"]
+	suggestionID := r.PathValue("id")
 
 	if suggestionID == "" {
 		http.Error(w, "suggestion ID is required", http.StatusBadRequest)

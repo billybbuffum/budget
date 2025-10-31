@@ -71,9 +71,10 @@ func main() {
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	allocationHandler := handlers.NewAllocationHandler(allocationService)
 	importHandler := handlers.NewImportHandler(importService)
+	transferSuggestionHandler := handlers.NewTransferSuggestionHandler(suggestionRepo, transactionRepo, accountRepo, transferLinkService)
 
 	// Setup router
-	router := http.NewRouter(accountHandler, categoryHandler, categoryGroupHandler, transactionHandler, allocationHandler, importHandler)
+	router := http.NewRouter(accountHandler, categoryHandler, categoryGroupHandler, transactionHandler, allocationHandler, importHandler, transferSuggestionHandler)
 
 	// Create server
 	server := http.NewServer(fmt.Sprintf(":%s", cfg.Server.Port), router)

@@ -2154,6 +2154,7 @@ async function init() {
         await loadCategories();
         await loadBudgetView();
         await loadSidebar(); // Load sidebar data
+        await updateSuggestionsBadge(); // Load transfer suggestions badge
 
         // Show helpful message if starting fresh
         if (accounts.length === 0 && categories.length === 0) {
@@ -2163,3 +2164,153 @@ async function init() {
         console.error('Failed to initialize app:', error);
     }
 }
+
+
+// ============================================================================
+// TRANSFER SUGGESTIONS
+// ============================================================================
+
+async function loadTransferSuggestions() {
+    try {
+        const data = await apiCall('/transfer-suggestions');
+        return data.suggestions || [];
+    } catch (error) {
+        console.error('Failed to load transfer suggestions:', error);
+        return [];
+    }
+}
+
+async function updateSuggestionsBadge() {
+    const suggestions = await loadTransferSuggestions();
+    const badge = document.getElementById('suggestions-badge');
+
+    if (suggestions.length > 0) {
+        badge.textContent = suggestions.length;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function showTransferSuggestionsView() {
+    document.getElementById('suggestions-modal').classList.add('active');
+    loadAndRenderSuggestions();
+}
+
+function closeSuggestionsView() {
+    document.getElementById('suggestions-modal').classList.remove('active');
+}
+
+async function loadAndRenderSuggestions() {
+    const suggestions = await loadTransferSuggestions();
+    const suggestionsList = document.getElementById('suggestions-list');
+    const suggestionsEmpty = document.getElementById('suggestions-empty');
+
+    if (suggestions.length === 0) {
+        suggestionsList.classList.add('hidden');
+        suggestionsEmpty.classList.remove('hidden');
+        return;
+    }
+
+    suggestionsList.classList.remove('hidden');
+    suggestionsEmpty.classList.add('hidden');
+
+    suggestionsList.innerHTML = suggestions.map(suggestion => renderSuggestion(suggestion)).join('');
+}
+
+function renderSuggestion(suggestion) {
+    const { transaction_a: txnA, transaction_b: txnB, account_a: accA, account_b: accB, confidence, score, is_credit_payment } = suggestion;
+
+    // Determine which is source and dest based on sign
+    const [sourceTxn, sourceAcc, destTxn, destAcc] = txnA.amount < 0
+        ? [txnA, accA, txnB, accB]
+        : [txnB, accB, txnA, accA];
+
+    const amount = Math.abs(sourceTxn.amount);
+    const dateA = formatDate(txnA.date);
+    const dateB = formatDate(txnB.date);
+    const sameDates = dateA === dateB;
+
+    const confidenceBadge = {
+        high: '<span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-semibold rounded">High Confidence</span>',
+        medium: '<span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs font-semibold rounded">Medium Confidence</span>',
+        low: '<span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-semibold rounded">Low Confidence</span>'
+    }[confidence];
+
+    const creditBadge = is_credit_payment
+        ? '<span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded ml-2">💳 Credit Card Payment</span>'
+        : '';
+
+    return `
+        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/30">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center gap-2">
+                    ${confidenceBadge}
+                    ${creditBadge}
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Score: ${score}</span>
+                </div>
+                <div class="text-lg font-bold text-gray-800 dark:text-gray-100">${formatCurrency(amount)}</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">From</div>
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">${sourceAcc.name}</div>
+                    <div class="text-sm text-red-600 dark:text-red-400">${formatCurrency(sourceTxn.amount)}</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">${dateA}</div>
+                    ${sourceTxn.description ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">"${sourceTxn.description}"</div>` : ''}
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-700">
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">To</div>
+                    <div class="font-semibold text-gray-800 dark:text-gray-100">${destAcc.name}</div>
+                    <div class="text-sm text-green-600 dark:text-green-400">${formatCurrency(destTxn.amount)}</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">${dateB}</div>
+                    ${destTxn.description ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">"${destTxn.description}"</div>` : ''}
+                </div>
+            </div>
+
+            ${!sameDates ? `<div class="text-xs text-yellow-600 dark:text-yellow-400 mb-3">ℹ️ Transactions are ${Math.abs(new Date(txnA.date) - new Date(txnB.date)) / (1000 * 60 * 60 * 24)} day(s) apart</div>` : ''}
+
+            ${is_credit_payment ? `<div class="text-xs text-blue-600 dark:text-blue-400 mb-3">💡 This will be categorized under the credit card payment category</div>` : ''}
+
+            <div class="flex gap-2 justify-end">
+                <button onclick="rejectSuggestion('${suggestion.id}')" class="btn-secondary text-sm">✗ Not a Match</button>
+                <button onclick="acceptSuggestion('${suggestion.id}')" class="btn-primary text-sm">✓ Link as Transfer</button>
+            </div>
+        </div>
+    `;
+}
+
+async function acceptSuggestion(suggestionId) {
+    try {
+        await apiCall(`/transfer-suggestions/${suggestionId}/accept`, {
+            method: 'POST'
+        });
+        showToast('Transactions linked successfully!', 'success');
+        await loadAndRenderSuggestions();
+        await updateSuggestionsBadge();
+        await loadSidebar(); // Refresh sidebar to update uncategorized count
+    } catch (error) {
+        showToast(`Failed to link transactions: ${error.message}`, 'error');
+    }
+}
+
+async function rejectSuggestion(suggestionId) {
+    try {
+        await apiCall(`/transfer-suggestions/${suggestionId}/reject`, {
+            method: 'POST'
+        });
+        showToast('Suggestion dismissed', 'success');
+        await loadAndRenderSuggestions();
+        await updateSuggestionsBadge();
+    } catch (error) {
+        showToast(`Failed to reject suggestion: ${error.message}`, 'error');
+    }
+}
+
+// Make functions available globally
+window.showTransferSuggestionsView = showTransferSuggestionsView;
+window.closeSuggestionsView = closeSuggestionsView;
+window.acceptSuggestion = acceptSuggestion;
+window.rejectSuggestion = rejectSuggestion;
