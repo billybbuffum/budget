@@ -41,6 +41,7 @@ func main() {
 	transactionRepo := repository.NewTransactionRepository(db)
 	allocationRepo := repository.NewAllocationRepository(db)
 	budgetStateRepo := repository.NewBudgetStateRepository(db)
+	suggestionRepo := repository.NewTransferSuggestionRepository(db)
 
 	// Initialize default data
 	bootstrapService := application.NewBootstrapService(categoryGroupRepo, categoryRepo)
@@ -59,7 +60,9 @@ func main() {
 	accountService := application.NewAccountService(accountRepo, categoryRepo, budgetStateRepo, transactionRepo, categoryGroupService)
 	transactionService := application.NewTransactionService(transactionRepo, accountRepo, categoryRepo, allocationRepo, budgetStateRepo)
 	allocationService := application.NewAllocationService(allocationRepo, categoryRepo, transactionRepo, budgetStateRepo, accountRepo)
-	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser)
+	transferMatcherService := application.NewTransferMatcherService(transactionRepo, accountRepo, suggestionRepo)
+	transferLinkService := application.NewTransferLinkService(transactionRepo, accountRepo, categoryRepo, allocationRepo, suggestionRepo)
+	importService := application.NewImportService(transactionRepo, accountRepo, budgetStateRepo, ofxParser, transferMatcherService)
 
 	// Initialize handlers
 	accountHandler := handlers.NewAccountHandler(accountService)

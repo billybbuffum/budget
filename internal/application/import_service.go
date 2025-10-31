@@ -17,6 +17,7 @@ type ImportService struct {
 	accountRepo     domain.AccountRepository
 	budgetStateRepo domain.BudgetStateRepository
 	ofxParser       *ofx.Parser
+	matcher         *TransferMatcherService
 }
 
 // NewImportService creates a new import service
@@ -25,12 +26,14 @@ func NewImportService(
 	accountRepo domain.AccountRepository,
 	budgetStateRepo domain.BudgetStateRepository,
 	ofxParser *ofx.Parser,
+	matcher *TransferMatcherService,
 ) *ImportService {
 	return &ImportService{
 		transactionRepo: transactionRepo,
 		accountRepo:     accountRepo,
 		budgetStateRepo: budgetStateRepo,
 		ofxParser:       ofxParser,
+		matcher:         matcher,
 	}
 }
 
@@ -153,6 +156,15 @@ func (s *ImportService) ImportFromOFX(ctx context.Context, accountID string, rea
 	}
 
 	result.NewAccountBalance = account.Balance
+
+	// After successful import, detect potential transfer matches
+	if len(result.ImportedTransactionIDs) > 0 && s.matcher != nil {
+		if err := s.matcher.FindMatchesForTransactions(ctx, result.ImportedTransactionIDs); err != nil {
+			// Log error but don't fail import
+			// The import succeeded, matching is optional
+			result.Errors = append(result.Errors, fmt.Sprintf("Failed to detect transfer matches: %v", err))
+		}
+	}
 
 	return result, nil
 }
