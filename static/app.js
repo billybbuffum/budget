@@ -2082,6 +2082,13 @@ async function loadAccountTransactionsPanel(accountId) {
                                 </div>
                             ` : '<div class="text-yellow-600 dark:text-yellow-400">Uncategorized</div>'}
                         </div>
+                        ${!isTransfer ? `
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <button onclick="showLinkCandidates('${txn.id}')" class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                                    🔗 Link as Transfer
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             });
@@ -2342,10 +2349,170 @@ function viewAllSuggestions() {
     backdrop.classList.remove('hidden');
 }
 
+// Show link candidates modal for manual linking
+async function showLinkCandidates(transactionId) {
+    const modal = document.getElementById('link-transfer-modal');
+    const sourceDisplay = document.getElementById('source-transaction-display');
+    const candidatesList = document.getElementById('link-candidates-list');
+
+    if (!modal || !sourceDisplay || !candidatesList) return;
+
+    try {
+        // Get all transactions
+        const allTransactions = await apiCall('/transactions');
+
+        // Find the source transaction
+        const sourceTxn = allTransactions.find(t => t.id === transactionId);
+        if (!sourceTxn) {
+            showToast('Transaction not found', 'error');
+            return;
+        }
+
+        // Find the source account
+        const sourceAccount = accounts.find(a => a.id === sourceTxn.account_id);
+
+        // Display source transaction
+        sourceDisplay.innerHTML = `
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="font-semibold text-gray-900 dark:text-gray-100">${sourceAccount?.name || 'Unknown'}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">${sourceTxn.description || 'No description'}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">${formatDate(sourceTxn.date)}</div>
+                </div>
+                <div class="text-xl font-bold ${sourceTxn.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">
+                    ${formatCurrency(sourceTxn.amount)}
+                </div>
+            </div>
+        `;
+
+        // Filter candidate transactions:
+        // - Must be opposite amount
+        // - Must be different account
+        // - Must be normal (not already a transfer)
+        const candidates = allTransactions.filter(t =>
+            t.id !== sourceTxn.id &&
+            t.type === 'normal' &&
+            t.account_id !== sourceTxn.account_id &&
+            t.amount === -sourceTxn.amount
+        );
+
+        // Sort by date proximity
+        candidates.sort((a, b) => {
+            const aDiff = Math.abs(new Date(a.date) - new Date(sourceTxn.date));
+            const bDiff = Math.abs(new Date(b.date) - new Date(sourceTxn.date));
+            return aDiff - bDiff;
+        });
+
+        // Render candidates
+        if (candidates.length === 0) {
+            candidatesList.innerHTML = `
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No matching transactions found. To be linkable, a transaction must:
+                    <ul class="mt-2 text-sm list-disc list-inside">
+                        <li>Have the opposite amount (${formatCurrency(-sourceTxn.amount)})</li>
+                        <li>Be in a different account</li>
+                        <li>Not already be a transfer</li>
+                    </ul>
+                </div>
+            `;
+        } else {
+            candidatesList.innerHTML = candidates.map(candidate => {
+                const candidateAccount = accounts.find(a => a.id === candidate.account_id);
+                const daysDiff = Math.abs(Math.floor((new Date(candidate.date) - new Date(sourceTxn.date)) / (1000 * 60 * 60 * 24)));
+
+                return `
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <div class="font-semibold text-gray-900 dark:text-gray-100">${candidateAccount?.name || 'Unknown'}</div>
+                                <div class="text-sm text-gray-600 dark:text-gray-400">${candidate.description || 'No description'}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    ${formatDate(candidate.date)}
+                                    ${daysDiff > 0 ? `<span class="ml-2 text-yellow-600 dark:text-yellow-400">(${daysDiff} days apart)</span>` : '<span class="ml-2 text-green-600 dark:text-green-400">(Same day)</span>'}
+                                </div>
+                            </div>
+                            <div class="text-lg font-bold ${candidate.amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">
+                                ${formatCurrency(candidate.amount)}
+                            </div>
+                        </div>
+                        <button
+                            onclick="manualLinkTransactions('${sourceTxn.id}', '${candidate.id}')"
+                            class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium">
+                            Link These Transactions
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Show modal
+        modal.classList.add('active');
+
+    } catch (error) {
+        console.error('Failed to load link candidates:', error);
+        showToast('Failed to load transactions: ' + error.message, 'error');
+    }
+}
+
+// Manual link two transactions as a transfer
+async function manualLinkTransactions(txnAId, txnBId) {
+    try {
+        await apiCall('/transactions/link', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                transaction_a_id: txnAId,
+                transaction_b_id: txnBId
+            })
+        });
+
+        showToast('Transactions linked successfully!', 'success');
+        closeLinkModal();
+
+        // Refresh data
+        await loadTransferSuggestions();
+        await loadTransactions();
+        await loadSidebar();
+
+        // Reload the transaction panel if it's open
+        const panel = document.getElementById('transaction-panel');
+        if (panel && !panel.classList.contains('translate-x-full')) {
+            // Panel is open, refresh it
+            const title = document.getElementById('transaction-panel-title');
+            if (title && title.textContent !== 'Transfer Match Suggestions') {
+                // Find which account was being viewed
+                const accountId = accounts.find(a => a.name === title.textContent)?.id;
+                if (accountId) {
+                    await loadAccountTransactionsPanel(accountId);
+                } else {
+                    await loadAccountTransactionsPanel(null);
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Failed to link transactions:', error);
+        showToast('Failed to link transactions: ' + error.message, 'error');
+    }
+}
+
+// Close link modal
+function closeLinkModal() {
+    const modal = document.getElementById('link-transfer-modal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
 // Make functions globally available
 window.acceptSuggestion = acceptSuggestion;
 window.rejectSuggestion = rejectSuggestion;
 window.viewAllSuggestions = viewAllSuggestions;
+window.showLinkCandidates = showLinkCandidates;
+window.manualLinkTransactions = manualLinkTransactions;
+window.closeLinkModal = closeLinkModal;
 
 // ============================================================================
 // END TRANSFER SUGGESTIONS FUNCTIONS

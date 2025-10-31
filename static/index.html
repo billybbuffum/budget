@@ -169,6 +169,26 @@
         </div>
     </div>
 
+    <!-- Link Transfer Modal -->
+    <div id="link-transfer-modal" class="modal" onclick="if(event.target === this) closeLinkModal()">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Link as Transfer</h2>
+                <button onclick="closeLinkModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl font-bold">&times;</button>
+            </div>
+
+            <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg" id="source-transaction-display">
+                <!-- Source transaction will be displayed here -->
+            </div>
+
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Select matching transaction:</h3>
+
+            <div id="link-candidates-list" class="space-y-2">
+                <!-- Candidate transactions will be loaded here -->
+            </div>
+        </div>
+    </div>
+
     <!-- Add Transaction Modal -->
     <div id="transaction-modal" class="modal" onclick="if(event.target === this) closeModal('transaction-modal')">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
