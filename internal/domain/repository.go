@@ -69,3 +69,15 @@ type BudgetStateRepository interface {
 	Update(ctx context.Context, state *BudgetState) error
 	AdjustReadyToAssign(ctx context.Context, delta int64) error
 }
+
+// TransferSuggestionRepository defines the interface for transfer match suggestion data operations
+type TransferSuggestionRepository interface {
+	Create(ctx context.Context, suggestion *TransferMatchSuggestion) error
+	GetByID(ctx context.Context, id string) (*TransferMatchSuggestion, error)
+	List(ctx context.Context) ([]*TransferMatchSuggestion, error)
+	ListByStatus(ctx context.Context, status SuggestionStatus) ([]*TransferMatchSuggestion, error)
+	ListPending(ctx context.Context) ([]*TransferMatchSuggestion, error)
+	FindByTransactions(ctx context.Context, txnAID, txnBID string) (*TransferMatchSuggestion, error)
+	Update(ctx context.Context, suggestion *TransferMatchSuggestion) error
+	Delete(ctx context.Context, id string) error
+}
