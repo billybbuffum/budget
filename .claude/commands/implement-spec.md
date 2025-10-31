@@ -115,7 +115,7 @@ Follow these steps to implement the specification thoroughly:
     - Verify budget calculations are tested
     - Check error handling is tested
 
-### Phase 6: Code Review
+### Phase 6: Code Review (with Review Loop)
 
 11. **Invoke code-reviewer agent**:
     ```
@@ -129,17 +129,97 @@ Follow these steps to implement the specification thoroughly:
       * Error handling
       * Code quality
       * Test coverage
-    - Return detailed review
+    - Return detailed review with severity levels:
+      * Critical issues (must fix)
+      * Important issues (should fix)
+      * Suggestions (nice to have)
     ```
 
-12. **Address review findings**:
-    - Fix any critical issues
-    - Address important suggestions
-    - Document decisions for suggestions not implemented
+12. **Address review findings and iterate**:
 
-### Phase 7: Verification
+    **IF critical or important issues found:**
+    - Fix critical issues immediately
+    - Fix important issues
+    - Document decisions for deferred suggestions
+    - **Re-invoke code-reviewer agent** to verify fixes
+    - **Repeat until no critical/important issues remain**
 
-13. **Run tests**:
+    **ONLY proceed to next phase when:**
+    - ✅ No critical issues
+    - ✅ No important issues (or documented why deferred)
+    - ✅ Code reviewer approves
+
+    **Review Loop Example:**
+    ```
+    First Review: ❌ 2 critical, 3 important issues found
+    → Fix issues
+    Second Review: ❌ 1 important issue found
+    → Fix issue
+    Third Review: ✅ No critical/important issues, approved!
+    → Proceed to Phase 7
+    ```
+
+### Phase 7: UI Testing (if feature has UI changes)
+
+13. **Determine if UI testing needed**:
+
+    **Skip this phase if:**
+    - Backend-only changes (no UI impact)
+    - API-only changes
+    - Database schema changes without UI
+
+    **Perform UI testing if:**
+    - New UI components
+    - Modified UI workflows
+    - Changes to forms or displays
+    - Budget calculations that affect UI
+
+14. **Invoke ui-tester agent** (if UI testing needed):
+    ```
+    Invoke the ui-tester agent to:
+    - Create test plan for UI workflows
+    - Use Playwright MCP to test interactively:
+      * Navigate through UI
+      * Fill forms
+      * Click buttons
+      * Verify displays update correctly
+      * Test budget calculations in UI
+      * Take screenshots if issues found
+    - Report test results:
+      * Tests passed: List successful workflows
+      * Tests failed: Detailed bug reports
+      * Screenshots and console errors
+    - If all tests pass: Generate automated Playwright test files
+    - Return comprehensive UI test report
+    ```
+
+15. **Fix UI bugs and retest** (if issues found):
+
+    **IF UI bugs found:**
+    - Review bug reports from ui-tester agent
+    - Fix JavaScript/HTML/CSS issues
+    - Fix backend issues causing UI problems
+    - **Re-invoke ui-tester agent** to verify fixes
+    - **Repeat until all UI tests pass**
+
+    **UI Testing Loop Example:**
+    ```
+    First Test: ❌ Save button doesn't work, Ready to Assign not updating
+    → Fix save handler and calculation update
+    Second Test: ❌ Ready to Assign updates but shows NaN
+    → Fix number formatting
+    Third Test: ✅ All UI workflows pass!
+    → Generate automated tests, proceed to Phase 8
+    ```
+
+16. **Verify automated tests generated** (if UI tests passed):
+    - Confirm Playwright test files created in `tests/e2e/`
+    - Tests ready for CI/CD
+    - Can run: `npx playwright test`
+
+### Phase 8: Verification
+
+17. **Run tests**:
     ```bash
     # Compile check
     go build ./...
@@ -151,47 +231,50 @@ Follow these steps to implement the specification thoroughly:
     go vet ./...
     ```
 
-14. **Test API endpoints** (if applicable):
+18. **Test API endpoints** (if applicable):
     - Use curl to test new/modified endpoints
     - Verify request/response formats
     - Test error cases
     - Validate status codes
 
-15. **Manual verification**:
+19. **Manual verification**:
     - Test the feature manually if needed
     - Verify business logic works correctly
     - Check edge cases
 
-### Phase 8: Documentation
+### Phase 9: Documentation
 
-16. **Update documentation**:
+20. **Update documentation**:
     - [ ] Update Claude.md with new entities/endpoints
     - [ ] Add comments to complex logic
     - [ ] Update API documentation
     - [ ] Document any breaking changes
+    - [ ] Document UI test files (if generated)
 
-### Phase 9: Final Check
+### Phase 10: Final Check
 
-17. **Architecture compliance check**:
+21. **Architecture compliance check**:
     - Run `/check-architecture` to verify clean architecture
     - Ensure no layer violations introduced
 
-18. **Security check** (if needed):
+22. **Security check** (if needed):
     - Invoke security-auditor agent for sensitive changes
     - Especially for:
       * Financial calculations
       * Database operations
       * User input handling
 
-### Phase 10: Completion
+### Phase 11: Completion
 
-19. **Summary**:
+23. **Summary**:
     - List all changes made
     - List all files created/modified
     - Confirm all requirements satisfied
     - Note any deviations from spec (with reasons)
+    - Confirm all reviews passed (code review, UI testing)
+    - List generated test files
 
-20. **Next steps**:
+24. **Next steps**:
     - Create commit with descriptive message
     - Push to branch
     - Ready for PR review

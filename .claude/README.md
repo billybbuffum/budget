@@ -18,6 +18,7 @@ This directory contains Claude Code customizations for the Budget application, i
 │   ├── security-auditor/
 │   └── budget-domain-expert/
 ├── commands/                    # Slash commands for common workflows
+│   ├── create-spec.md          # 🆕 Create validated specification
 │   ├── implement-spec.md       # 🆕 Orchestrate full spec implementation
 │   ├── new-feature.md
 │   ├── new-endpoint.md
@@ -31,6 +32,9 @@ This directory contains Claude Code customizations for the Budget application, i
     ├── zero-based-budgeting/
     ├── go-testing/
     └── sqlite-best-practices/
+
+docs/                            # Specifications created by /create-spec
+└── SPEC_TEMPLATE.md            # Template for specifications
 ```
 
 ## 🤖 Sub Agents
@@ -75,6 +79,12 @@ Sub agents are specialized AI assistants for complex tasks with isolated context
    - Ensures correct rollover behavior
    - Credit card logic validation
 
+7. **ui-tester** - Interactive UI testing with Playwright MCP
+   - Tests UI workflows in actual browser
+   - Finds UI bugs in real-time
+   - Generates automated Playwright tests
+   - Verifies UI matches specifications
+
 ### Using Sub Agents
 
 In conversation with Claude, reference agents like:
@@ -88,32 +98,58 @@ Slash commands are reusable workflows for common tasks.
 
 ### Available Commands
 
-- **/implement-spec** `<spec-url>` - 🆕 **Orchestrate complete spec implementation workflow**
+**Spec-Driven Development (Recommended Workflow):**
+
+- **/create-spec** `<feature-description>` - 🆕 **Create validated specification with domain expert review**
+  - Gathers requirements interactively
+  - Invokes budget-domain-expert for business logic validation
+  - Invokes security-auditor for early security review
+  - Designs API contracts and database schema
+  - Creates comprehensive test plan
+  - Generates `docs/spec-*.md` ready for implementation
+  - **Start here for new features!**
+
+- **/implement-spec** `<spec-url>` - **Implement a validated specification**
   - Fetches and analyzes specification
   - Invokes budget-domain-expert for validation
   - Creates implementation with proper architecture
   - Generates tests and performs code review
-  - **Start here for implementing requirements!**
+  - **Use after /create-spec or with existing specs**
+
+**Direct Development:**
 
 - **/new-feature** `<feature-name>` - Scaffold new feature following clean architecture
 - **/new-endpoint** `<description>` - Add new API endpoint
 - **/review-pr** - Review PR with budget app specific checks
 - **/check-architecture** - Verify clean architecture compliance
 - **/test-endpoint** `<path>` - Test API endpoint with curl
+- **/test-ui** `<workflow-description>` - Test UI interactively with Playwright MCP
 - **/run-tests** - Run all tests and report results
 - **/generate-docs** - Generate comprehensive API documentation
 
 ### Using Slash Commands
 
 Type `/` in Claude Code to see available commands, then:
+
+**Spec-Driven Workflow (Recommended):**
 ```
-/implement-spec https://github.com/.../spec.md
+# 1. Create validated spec
+/create-spec "Add recurring transactions feature"
+
+# 2. Review spec in docs/spec-recurring-transactions.md
+
+# 3. Implement the spec
+/implement-spec docs/spec-recurring-transactions.md
+```
+
+**Direct Development:**
+```
 /new-feature user-authentication
 /test-endpoint /api/accounts
 /review-pr
 ```
 
-**💡 Pro Tip**: Start with `/implement-spec` for most requirements - it orchestrates the entire workflow automatically!
+**💡 Pro Tip**: Use `/create-spec` first to validate requirements with domain expert, then `/implement-spec` to build it!
 
 ## 🎯 Skills
 
@@ -175,6 +211,7 @@ Includes installation instructions and use cases.
 ### WORKFLOWS.md
 
 Common development workflows with step-by-step examples:
+- **Spec-Driven Development** (Recommended approach!)
 - Implementing a specification (3 different methods)
 - Creating new features
 - Adding API endpoints
@@ -191,23 +228,31 @@ Common development workflows with step-by-step examples:
 ### 1. Review the Guides
 
 Start by reading:
-1. `WORKFLOWS.md` - **Start here!** See practical examples
+1. `WORKFLOWS.md` - **Start here!** See spec-driven development workflow
 2. `FEATURE_USAGE_GUIDE.md` - Understand when to use each feature
 3. `MCP_RECOMMENDATIONS.md` - Install recommended MCPs
+4. `docs/SPEC_TEMPLATE.md` - See what a complete spec looks like
 
-### 2. Try the Orchestration Command
+### 2. Try Spec-Driven Development (Recommended)
 
-The fastest way to implement a requirement:
+The most effective workflow - create validated spec first:
 ```
-/implement-spec https://github.com/.../spec.md
+# Create specification with domain validation
+/create-spec "Add ability to track savings goals per category"
+
+# Review generated spec
+cat docs/spec-savings-goals.md
+
+# Implement the validated spec
+/implement-spec docs/spec-savings-goals.md
 ```
 
-This automatically:
-- Fetches and analyzes the spec
-- Invokes budget-domain-expert for validation
-- Creates implementation
-- Generates tests
-- Performs code review
+**Benefits:**
+- Domain expert validates before coding
+- Security reviewed early
+- Clear requirements
+- Auto-generated documentation
+- Less rework
 
 ### 3. Try Individual Commands
 
@@ -232,7 +277,37 @@ Skills automatically activate based on context. Just work naturally and they'll 
 
 ## 💡 Example Workflows
 
-### Implementing a Specification (Most Common)
+### Spec-Driven Development (Recommended)
+
+```
+# Step 1: Create validated specification
+/create-spec "Add recurring transactions that auto-create monthly"
+
+→ Claude interactively:
+  1. Gathers requirements and asks clarifying questions
+  2. Invokes budget-domain-expert to validate business logic
+  3. Invokes security-auditor for security review
+  4. Designs database schema and API contracts
+  5. Creates comprehensive test plan
+  6. Generates docs/spec-recurring-transactions.md
+
+# Step 2: Review the spec (optional but recommended)
+cat docs/spec-recurring-transactions.md
+# Review with team, make adjustments, approve
+
+# Step 3: Implement the validated spec
+/implement-spec docs/spec-recurring-transactions.md
+
+→ Claude executes the validated plan:
+  1. Follows the technical design from spec
+  2. Generates tests from test plan
+  3. Verifies implementation matches spec
+  4. Code review passes quickly (already validated)
+
+Result: High-quality feature with minimal rework!
+```
+
+### Implementing a Specification (When You Have a Spec)
 
 ```
 /implement-spec https://github.com/billybbuffum/budget/blob/branch/docs/spec.md
@@ -290,6 +365,20 @@ Then:
   3. Tests error cases
   4. Validates responses
   5. Reports results
+```
+
+### Testing UI Interactively
+
+```
+/test-ui "allocation creation workflow"
+
+→ Claude with ui-tester agent:
+  1. Creates test plan
+  2. Uses Playwright MCP to open browser
+  3. Tests workflow like a real user
+  4. Reports bugs if found
+  5. Generates automated tests if all passes
+  6. Test files ready for CI/CD
 ```
 
 ## 🎓 Learning Path

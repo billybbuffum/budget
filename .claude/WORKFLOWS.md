@@ -6,14 +6,168 @@
 
 ## Table of Contents
 
-1. [Implementing a Specification](#implementing-a-specification)
-2. [Creating a New Feature](#creating-a-new-feature)
-3. [Adding an API Endpoint](#adding-an-api-endpoint)
-4. [Reviewing Code](#reviewing-code)
-5. [Fixing a Bug](#fixing-a-bug)
-6. [Refactoring Code](#refactoring-code)
-7. [Testing](#testing)
-8. [Deployment](#deployment)
+1. [Spec-Driven Development (Recommended)](#spec-driven-development-recommended)
+2. [Implementing a Specification](#implementing-a-specification)
+3. [Creating a New Feature](#creating-a-new-feature)
+4. [Adding an API Endpoint](#adding-an-api-endpoint)
+5. [Reviewing Code](#reviewing-code)
+6. [Fixing a Bug](#fixing-a-bug)
+7. [Refactoring Code](#refactoring-code)
+8. [Testing](#testing)
+9. [Deployment](#deployment)
+
+---
+
+## Spec-Driven Development (Recommended)
+
+**The most effective workflow**: Create a validated specification first, then implement it.
+
+### Why Spec-Driven Development?
+
+✅ **Catch issues early** - Domain and security problems found before coding
+✅ **Clear requirements** - No ambiguity about what to build
+✅ **Faster development** - Just execute a validated plan
+✅ **Better documentation** - Spec serves as documentation automatically
+✅ **Team alignment** - Everyone reviews and approves before work starts
+
+### Complete Workflow
+
+#### Step 1: Create Specification
+
+```
+/create-spec "Add recurring transactions feature that auto-creates transactions monthly"
+```
+
+**What happens**:
+1. 🎯 Gathers requirements (asks clarifying questions if needed)
+2. 🧠 **Invokes budget-domain-expert** to validate business logic
+   - Checks zero-based budgeting impact
+   - Validates formulas and calculations
+   - Identifies domain constraints
+3. 🔒 **Invokes security-auditor** for early security review
+   - Identifies potential vulnerabilities
+   - Documents security requirements
+4. 📐 Designs technical solution
+   - Database schema changes
+   - API contracts
+   - Service layer design
+5. ✅ Creates test plan
+   - Unit, integration, and API tests
+   - Acceptance criteria
+6. 📄 Generates `docs/spec-recurring-transactions.md`
+   - Complete specification document
+   - Already validated by experts
+   - Ready for implementation
+
+**Output**: `docs/spec-recurring-transactions.md`
+
+**Time**: 10-20 minutes
+
+---
+
+#### Step 2: Review Specification (Optional but Recommended)
+
+```bash
+# Review the generated spec
+cat docs/spec-recurring-transactions.md
+
+# Discuss with team/stakeholders
+# Make adjustments if needed
+# Much cheaper to change now than after coding!
+```
+
+**Benefits of review**:
+- Stakeholders can approve before any code is written
+- Team can identify issues in the design phase
+- Estimates are more accurate with clear spec
+- Changes are quick (just edit the markdown)
+
+---
+
+#### Step 3: Implement Validated Specification
+
+```
+/implement-spec docs/spec-recurring-transactions.md
+```
+
+**What happens**:
+1. Reads the specification (already validated!)
+2. Domain validation already done ✓
+3. Security review already done ✓
+4. Just executes the technical design
+5. Generates tests from test plan
+6. Verifies implementation matches spec
+
+**Time**: 30-90 minutes depending on complexity
+
+---
+
+### Example: Full Spec-Driven Cycle
+
+**Monday: Create Spec**
+```
+/create-spec "Add ability to import transactions from OFX files"
+
+→ Domain expert validates: ✅ Approved
+→ Security auditor reviews: ✅ Requirements identified
+→ Spec created: docs/spec-ofx-import.md
+→ Time: 15 minutes
+```
+
+**Tuesday: Team Review**
+```
+Team reviews spec
+Product Owner approves functionality
+Tech Lead approves design
+All aligned on approach
+```
+
+**Wednesday: Implement**
+```
+/implement-spec docs/spec-ofx-import.md
+
+→ Follows validated design
+→ Generates tests from test plan
+→ Code review passes quickly (matches spec)
+→ Time: 60 minutes
+```
+
+**Result**:
+- Feature delivered with high confidence
+- No surprises or rework
+- Team was aligned throughout
+- Documentation complete
+- Total time: ~90 minutes vs. potentially hours of rework without spec
+
+---
+
+### When to Use Spec-Driven Development
+
+✅ **Always use for**:
+- New features with business logic
+- Changes to existing budget calculations
+- New API endpoints
+- Database schema changes
+- Anything involving money or security
+
+⚠️ **Consider skipping for**:
+- Trivial changes (typo fixes, UI tweaks)
+- Quick experiments or prototypes
+- Already have detailed requirements document
+
+---
+
+### Spec-Driven vs. Direct Implementation
+
+| Aspect | Spec-Driven | Direct Implementation |
+|--------|-------------|----------------------|
+| **Initial time** | 10-20 min (spec creation) | 0 min |
+| **Validation** | Early (before coding) | Late (during review) |
+| **Rework** | Minimal (issues caught early) | Common (issues found after coding) |
+| **Total time** | Usually less | Often more (due to rework) |
+| **Documentation** | Automatic | Manual effort |
+| **Team alignment** | High | Variable |
+| **Confidence** | High (validated upfront) | Variable |
 
 ---
 
@@ -356,6 +510,66 @@ curl -X POST http://localhost:8080/api/accounts \
 
 # Get accounts
 curl http://localhost:8080/api/accounts
+```
+
+---
+
+### Test UI Interactively
+
+**Interactive UI testing with Playwright MCP:**
+```
+/test-ui "allocation creation workflow"
+```
+
+**What happens:**
+1. ui-tester agent creates test plan
+2. Uses Playwright MCP to actually open browser
+3. Clicks through UI like a real user
+4. Reports bugs if found
+5. Generates automated tests if all passes
+
+**Example workflow:**
+```
+# Test allocation creation
+/test-ui "create allocation and verify Ready to Assign updates"
+
+→ Opens browser at localhost:8080
+→ Clicks Budget tab
+→ Fills in allocation form
+→ Saves allocation
+→ Verifies Ready to Assign decreases
+→ Reports: "✅ All tests passed" or "❌ Bug found: Save button doesn't work"
+```
+
+**UI Testing vs Test Generation:**
+- **Playwright MCP** (via /test-ui): Actually runs in browser, finds bugs
+- **Test Generation** (test-generator agent): Creates `.spec.ts` files for CI/CD
+
+**Common UI tests:**
+```
+# Test specific workflows
+/test-ui "transaction creation and balance update"
+/test-ui "rollover calculation display"
+/test-ui "credit card payment category auto-creation"
+
+# Test form validation
+/test-ui "allocation form validation with invalid input"
+
+# Test responsive design
+/test-ui "budget page on mobile, tablet, and desktop"
+```
+
+**When UI bugs found:**
+```
+1. /test-ui "feature workflow"
+   → Finds bug: "Save button doesn't work"
+
+2. Fix the bug in code
+
+3. /test-ui "feature workflow"
+   → Verify fix: "✅ All tests pass"
+
+4. Automated tests generated in tests/e2e/
 ```
 
 ---
