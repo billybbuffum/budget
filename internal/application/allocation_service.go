@@ -62,12 +62,6 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 			return nil, err
 		}
 
-		// RETROACTIVE PAYMENT CATEGORY ALLOCATION
-		// Sync payment categories when updating allocation
-		if err := s.syncPaymentCategoryAllocations(ctx, categoryID); err != nil {
-			fmt.Printf("Warning: failed to sync payment category allocations: %v\n", err)
-		}
-
 		return existing, nil
 	}
 
@@ -86,142 +80,88 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 		return nil, err
 	}
 
-	// RETROACTIVE PAYMENT CATEGORY ALLOCATION
-	// When allocating to an expense category, check for CC spending and allocate to payment categories
-	if err := s.syncPaymentCategoryAllocations(ctx, categoryID); err != nil {
-		// Log error but don't fail the allocation
-		// The payment category allocation can be synced later
-		fmt.Printf("Warning: failed to sync payment category allocations: %v\n", err)
-	}
-
 	return allocation, nil
 }
 
-// syncPaymentCategoryAllocations checks for credit card spending on a category
-// and allocates to payment categories retroactively
-func (s *AllocationService) syncPaymentCategoryAllocations(ctx context.Context, categoryID string) error {
-	// Get all credit card accounts
-	allAccounts, err := s.accountRepo.List(ctx)
+// AllocateToCoverUnderfunded creates an allocation to cover an underfunded payment category
+// This method manually allocates funds from Ready to Assign to a payment category that
+// doesn't have enough money to cover its associated credit card balance.
+//
+// Returns:
+//   - allocation: The created or updated allocation
+//   - underfundedAmount: The amount that was underfunded (and now covered)
+//   - error: Any error that occurred
+func (s *AllocationService) AllocateToCoverUnderfunded(
+	ctx context.Context,
+	paymentCategoryID string,
+	period string,
+) (*domain.Allocation, int64, error) {
+	// 1. Validate that the category exists and is a payment category
+	category, err := s.categoryRepo.GetByID(ctx, paymentCategoryID)
 	if err != nil {
-		return err
+		return nil, 0, fmt.Errorf("payment category not found")
 	}
 
-	for _, account := range allAccounts {
-		if account.Type != domain.AccountTypeCredit {
-			continue
-		}
+	if category.PaymentForAccountID == nil || *category.PaymentForAccountID == "" {
+		return nil, 0, fmt.Errorf("category is not a payment category")
+	}
 
-		// Get payment category for this CC
-		paymentCategory, err := s.categoryRepo.GetPaymentCategoryByAccountID(ctx, account.ID)
-		if err != nil || paymentCategory == nil {
-			continue
-		}
+	// 2. Calculate the underfunded amount using GetAllocationSummary
+	summaries, err := s.GetAllocationSummary(ctx, period)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to calculate allocation summary: %w", err)
+	}
 
-		// Get all transactions on this CC for the given expense category
-		ccTransactions, err := s.transactionRepo.ListByAccount(ctx, account.ID)
-		if err != nil {
-			continue
-		}
-
-		var totalCCSpending int64
-		for _, txn := range ccTransactions {
-			if txn.CategoryID != nil && *txn.CategoryID == categoryID && txn.Amount < 0 {
-				totalCCSpending += -txn.Amount // Convert to positive
+	var underfundedAmount int64
+	var found bool
+	for _, summary := range summaries {
+		if summary.Category.ID == paymentCategoryID {
+			found = true
+			if summary.Underfunded != nil && *summary.Underfunded > 0 {
+				underfundedAmount = *summary.Underfunded
 			}
-		}
-
-		if totalCCSpending == 0 {
-			continue
-		}
-
-		// Get the expense category's total allocation
-		allAllocations, err := s.allocationRepo.List(ctx)
-		if err != nil {
-			continue
-		}
-
-		var expenseCategoryAllocated int64
-		for _, alloc := range allAllocations {
-			if alloc.CategoryID == categoryID {
-				expenseCategoryAllocated += alloc.Amount
-			}
-		}
-
-		// Calculate how much to allocate to payment category
-		// Move the minimum of: CC spending or expense category allocation
-		amountToAllocate := totalCCSpending
-		if expenseCategoryAllocated < totalCCSpending {
-			amountToAllocate = expenseCategoryAllocated
-		}
-
-		if amountToAllocate == 0 {
-			continue
-		}
-
-		// Update payment category allocation by adding this category's contribution
-		// Find the allocation for the current period (or create one)
-		period := time.Now().Format("2006-01")
-		paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategory.ID, period)
-
-		if err != nil {
-			// Create new payment category allocation
-			newAlloc := &domain.Allocation{
-				ID:         uuid.New().String(),
-				CategoryID: paymentCategory.ID,
-				Amount:     amountToAllocate,
-				Period:     period,
-				Notes:      "Auto-allocated from retroactive CC spending",
-				CreatedAt:  time.Now(),
-				UpdatedAt:  time.Now(),
-			}
-
-			if err := s.allocationRepo.Create(ctx, newAlloc); err != nil {
-				return err
-			}
-		} else {
-			// Update existing allocation
-			// Calculate how much of the payment allocation comes from THIS expense category
-			// by checking previous allocations. We need to recalculate the entire payment allocation.
-
-			// Get ALL expense categories' CC spending and allocations
-			var totalShouldBeAllocated int64
-			ccTxns, _ := s.transactionRepo.ListByAccount(ctx, account.ID)
-			categoryContributions := make(map[string]int64)
-
-			for _, txn := range ccTxns {
-				if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 {
-					categoryContributions[*txn.CategoryID] += -txn.Amount
-				}
-			}
-
-			for catID, spending := range categoryContributions {
-				var catAlloc int64
-				for _, alloc := range allAllocations {
-					if alloc.CategoryID == catID {
-						catAlloc += alloc.Amount
-					}
-				}
-
-				contribution := spending
-				if catAlloc < spending {
-					contribution = catAlloc
-				}
-				totalShouldBeAllocated += contribution
-			}
-
-			// Update payment category to match total
-			if totalShouldBeAllocated != paymentAlloc.Amount {
-				paymentAlloc.Amount = totalShouldBeAllocated
-				paymentAlloc.UpdatedAt = time.Now()
-
-				if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
-					return err
-				}
-			}
+			break
 		}
 	}
 
-	return nil
+	if !found {
+		return nil, 0, fmt.Errorf("payment category not found in summary")
+	}
+
+	// 3. Check that there is actually an underfunded amount
+	if underfundedAmount <= 0 {
+		return nil, 0, fmt.Errorf("payment category is not underfunded")
+	}
+
+	// 4. Calculate Ready to Assign to verify sufficient funds
+	readyToAssign, err := s.CalculateReadyToAssignForPeriod(ctx, period)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to calculate Ready to Assign: %w", err)
+	}
+
+	// 5. Verify that Ready to Assign has sufficient funds
+	if readyToAssign < underfundedAmount {
+		return nil, 0, fmt.Errorf(
+			"insufficient funds: Ready to Assign: $%.2f, Underfunded: $%.2f",
+			float64(readyToAssign)/100,
+			float64(underfundedAmount)/100,
+		)
+	}
+
+	// 6. Create or update the allocation (upsert behavior)
+	// Use CreateAllocation which already has upsert logic
+	allocation, err := s.CreateAllocation(
+		ctx,
+		paymentCategoryID,
+		underfundedAmount,
+		period,
+		"Cover underfunded credit card spending",
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create allocation: %w", err)
+	}
+
+	return allocation, underfundedAmount, nil
 }
 
 // GetAllocation retrieves an allocation by ID
