@@ -48,8 +48,10 @@ func ValidatePeriodRange(period string) error {
 
 	// Calculate acceptable range
 	now := time.Now()
-	minDate := now.AddDate(-2, 0, 0)  // 2 years ago
-	maxDate := now.AddDate(5, 0, 0)   // 5 years in future
+	// Normalize to first day of month for fair comparison since periods are month-granular
+	normalizedNow := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	minDate := normalizedNow.AddDate(-2, 0, 0)  // 2 years ago
+	maxDate := normalizedNow.AddDate(5, 0, 0)   // 5 years in future
 
 	if periodTime.Before(minDate) {
 		return fmt.Errorf("period is too far in the past (more than 2 years)")

@@ -1,19 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
-	"github.com/billybbuffum/budget/internal/application"
+	"github.com/billybbuffum/budget/internal/domain"
 	"github.com/billybbuffum/budget/internal/infrastructure/http/validators"
 )
 
-type AllocationHandler struct {
-	allocationService *application.AllocationService
+// AllocationServiceInterface defines the interface for allocation operations
+type AllocationServiceInterface interface {
+	CreateAllocation(ctx context.Context, categoryID string, amount int64, period, notes string) (*domain.Allocation, error)
+	GetAllocation(ctx context.Context, id string) (*domain.Allocation, error)
+	ListAllocations(ctx context.Context) ([]*domain.Allocation, error)
+	ListAllocationsByPeriod(ctx context.Context, period string) ([]*domain.Allocation, error)
+	DeleteAllocation(ctx context.Context, id string) error
+	GetAllocationSummary(ctx context.Context, period string) ([]*domain.AllocationSummary, error)
+	AllocateToCoverUnderfunded(ctx context.Context, paymentCategoryID string, period string) (*domain.Allocation, int64, error)
+	CalculateReadyToAssignForPeriod(ctx context.Context, period string) (int64, error)
 }
 
-func NewAllocationHandler(allocationService *application.AllocationService) *AllocationHandler {
+type AllocationHandler struct {
+	allocationService AllocationServiceInterface
+}
+
+func NewAllocationHandler(allocationService AllocationServiceInterface) *AllocationHandler {
 	return &AllocationHandler{
 		allocationService: allocationService,
 	}
@@ -192,22 +206,16 @@ func (h *AllocationHandler) CoverUnderfunded(w http.ResponseWriter, r *http.Requ
 		// Log detailed error internally
 		log.Printf("ERROR: Failed to cover underfunded for category %s: %v", req.PaymentCategoryID, err)
 
-		// Determine appropriate status code and user-facing message
-		errorMsg := err.Error()
-
-		// Check if it's a "not found" error
-		if errorMsg == "payment category not found" {
-			http.Error(w, errorMsg, http.StatusNotFound)
+		// Use typed error checking for appropriate status codes
+		if errors.Is(err, domain.ErrCategoryNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
 
-		// Check if it's a validation error (bad request)
-		if errorMsg == "category is not a payment category" ||
-			errorMsg == "payment category is not underfunded" ||
-			errorMsg == "payment category not found in summary" ||
-			// Insufficient funds error starts with "insufficient funds:"
-			len(errorMsg) >= 19 && errorMsg[:19] == "insufficient funds:" {
-			http.Error(w, errorMsg, http.StatusBadRequest)
+		if errors.Is(err, domain.ErrNotPaymentCategory) ||
+			errors.Is(err, domain.ErrNotUnderfunded) ||
+			errors.Is(err, domain.ErrInsufficientFunds) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

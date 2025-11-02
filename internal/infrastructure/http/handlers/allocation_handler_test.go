@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,11 +54,7 @@ func (m *mockAllocationService) ListAllocations(ctx context.Context) ([]*domain.
 	return nil, nil
 }
 
-func (m *mockAllocationService) GetAllocationsByPeriod(ctx context.Context, period string) ([]*domain.Allocation, error) {
-	return nil, nil
-}
-
-func (m *mockAllocationService) UpdateAllocation(ctx context.Context, id string, amount int64, notes string) (*domain.Allocation, error) {
+func (m *mockAllocationService) ListAllocationsByPeriod(ctx context.Context, period string) ([]*domain.Allocation, error) {
 	return nil, nil
 }
 
@@ -269,7 +266,7 @@ func TestAllocationHandler_CoverUnderfunded_PeriodOutOfRange(t *testing.T) {
 func TestAllocationHandler_CoverUnderfunded_CategoryNotFound(t *testing.T) {
 	// Setup
 	mockService := &mockAllocationService{
-		allocateToCoverUnderfundedError: errors.New("payment category not found"),
+		allocateToCoverUnderfundedError: domain.ErrCategoryNotFound,
 	}
 	handler := NewAllocationHandler(mockService)
 
@@ -291,15 +288,15 @@ func TestAllocationHandler_CoverUnderfunded_CategoryNotFound(t *testing.T) {
 		t.Errorf("CoverUnderfunded() status = %d, want %d", w.Code, http.StatusNotFound)
 	}
 
-	if !bytes.Contains(w.Body.Bytes(), []byte("payment category not found")) {
-		t.Errorf("CoverUnderfunded() body = %s, want 'payment category not found'", w.Body.String())
+	if !bytes.Contains(w.Body.Bytes(), []byte("category not found")) {
+		t.Errorf("CoverUnderfunded() body = %s, want 'category not found'", w.Body.String())
 	}
 }
 
 func TestAllocationHandler_CoverUnderfunded_NotPaymentCategory(t *testing.T) {
 	// Setup
 	mockService := &mockAllocationService{
-		allocateToCoverUnderfundedError: errors.New("category is not a payment category"),
+		allocateToCoverUnderfundedError: domain.ErrNotPaymentCategory,
 	}
 	handler := NewAllocationHandler(mockService)
 
@@ -329,7 +326,7 @@ func TestAllocationHandler_CoverUnderfunded_NotPaymentCategory(t *testing.T) {
 func TestAllocationHandler_CoverUnderfunded_NotUnderfunded(t *testing.T) {
 	// Setup
 	mockService := &mockAllocationService{
-		allocateToCoverUnderfundedError: errors.New("payment category is not underfunded"),
+		allocateToCoverUnderfundedError: domain.ErrNotUnderfunded,
 	}
 	handler := NewAllocationHandler(mockService)
 
@@ -357,9 +354,15 @@ func TestAllocationHandler_CoverUnderfunded_NotUnderfunded(t *testing.T) {
 }
 
 func TestAllocationHandler_CoverUnderfunded_InsufficientFunds(t *testing.T) {
-	// Setup
+	// Setup - wrap the domain error with context like the service does
+	insufficientFundsErr := fmt.Errorf(
+		"%w: Ready to Assign: $%.2f, Underfunded: $%.2f",
+		domain.ErrInsufficientFunds,
+		1.00,
+		5.00,
+	)
 	mockService := &mockAllocationService{
-		allocateToCoverUnderfundedError: errors.New("insufficient funds: Ready to Assign: $1.00, Underfunded: $5.00"),
+		allocateToCoverUnderfundedError: insufficientFundsErr,
 	}
 	handler := NewAllocationHandler(mockService)
 

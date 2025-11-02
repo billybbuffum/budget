@@ -83,12 +83,16 @@ func (s *AllocationService) CreateAllocation(ctx context.Context, categoryID str
 	return allocation, nil
 }
 
-// AllocateToCoverUnderfunded creates an allocation to cover an underfunded payment category
-// This method manually allocates funds from Ready to Assign to a payment category that
-// doesn't have enough money to cover its associated credit card balance.
+// AllocateToCoverUnderfunded creates allocations to cover an underfunded payment category
+// This method:
+// 1. Allocates to expense categories with overspending (like Groceries)
+// 2. Then moves that money to the payment category (simulating real-time allocation)
+//
+// This way, RTA only decreases by the amount allocated to expense categories,
+// and the money flows from expense → payment just like it would if you'd budgeted first.
 //
 // Returns:
-//   - allocation: The created or updated allocation
+//   - allocation: The payment category allocation that was created/updated
 //   - underfundedAmount: The amount that was underfunded (and now covered)
 //   - error: Any error that occurred
 func (s *AllocationService) AllocateToCoverUnderfunded(
@@ -99,11 +103,11 @@ func (s *AllocationService) AllocateToCoverUnderfunded(
 	// 1. Validate that the category exists and is a payment category
 	category, err := s.categoryRepo.GetByID(ctx, paymentCategoryID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("payment category not found")
+		return nil, 0, domain.ErrCategoryNotFound
 	}
 
 	if category.PaymentForAccountID == nil || *category.PaymentForAccountID == "" {
-		return nil, 0, fmt.Errorf("category is not a payment category")
+		return nil, 0, domain.ErrNotPaymentCategory
 	}
 
 	// 2. Calculate the underfunded amount using GetAllocationSummary
@@ -130,7 +134,7 @@ func (s *AllocationService) AllocateToCoverUnderfunded(
 
 	// 3. Check that there is actually an underfunded amount
 	if underfundedAmount <= 0 {
-		return nil, 0, fmt.Errorf("payment category is not underfunded")
+		return nil, 0, domain.ErrNotUnderfunded
 	}
 
 	// 4. Calculate Ready to Assign to verify sufficient funds
@@ -142,26 +146,109 @@ func (s *AllocationService) AllocateToCoverUnderfunded(
 	// 5. Verify that Ready to Assign has sufficient funds
 	if readyToAssign < underfundedAmount {
 		return nil, 0, fmt.Errorf(
-			"insufficient funds: Ready to Assign: $%.2f, Underfunded: $%.2f",
+			"%w: Ready to Assign: $%.2f, Underfunded: $%.2f",
+			domain.ErrInsufficientFunds,
 			float64(readyToAssign)/100,
 			float64(underfundedAmount)/100,
 		)
 	}
 
-	// 6. Create or update the allocation (upsert behavior)
-	// Use CreateAllocation which already has upsert logic
-	allocation, err := s.CreateAllocation(
-		ctx,
-		paymentCategoryID,
-		underfundedAmount,
-		period,
-		"Cover underfunded credit card spending",
-	)
+	// 6. Find all expense categories with overspending on this credit card
+	// Get all transactions on this credit card
+	ccTransactions, err := s.transactionRepo.ListByAccount(ctx, *category.PaymentForAccountID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create allocation: %w", err)
+		return nil, 0, fmt.Errorf("failed to get credit card transactions: %w", err)
 	}
 
-	return allocation, underfundedAmount, nil
+	// Group by category and calculate spending per category
+	categorySpending := make(map[string]int64)
+	for _, txn := range ccTransactions {
+		if txn.CategoryID != nil && *txn.CategoryID != "" && txn.Amount < 0 {
+			// This is spending on an expense category
+			categorySpending[*txn.CategoryID] += -txn.Amount // Convert to positive
+		}
+	}
+
+	// Get all allocations to calculate what's already allocated
+	allAllocations, err := s.allocationRepo.List(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get allocations: %w", err)
+	}
+
+	// Calculate total allocated per category
+	categoryAllocations := make(map[string]int64)
+	for _, alloc := range allAllocations {
+		categoryAllocations[alloc.CategoryID] += alloc.Amount
+	}
+
+	// 7. Allocate to underfunded expense categories (like Groceries)
+	// This creates the budget for categories where spending already happened
+	// IMPORTANT: We use CreateAllocation here, which properly reduces RTA
+	var totalAllocatedToExpenses int64
+	for catID, spending := range categorySpending {
+		allocated := categoryAllocations[catID]
+		if spending > allocated {
+			// This category is overspent, allocate to cover it
+			_, err := s.CreateAllocation(
+				ctx,
+				catID,
+				spending, // Allocate the TOTAL spending amount (upsert will replace existing)
+				period,
+				"Cover overspending on credit card",
+			)
+			if err != nil {
+				return nil, 0, fmt.Errorf("failed to allocate to expense category: %w", err)
+			}
+			// Track how much we allocated to expenses
+			totalAllocatedToExpenses += (spending - allocated)
+		}
+	}
+
+	// 8. Now "move" the money from expense categories to payment category
+	// We do this by setting the payment allocation to match the card balance
+	// This simulates what real-time allocation does - it moves money between categories
+	// without reducing RTA again
+	//
+	// IMPORTANT: Payment category allocations are EXCLUDED from RTA calculation
+	// (see CalculateReadyToAssignForPeriod lines 441-447). This means we can store
+	// them directly in the database without going through CreateAllocation, and they
+	// won't double-reduce RTA. The expense allocations above already reduced RTA.
+
+	// Get the credit card account to determine total amount needed for payment
+	account, err := s.accountRepo.GetByID(ctx, *category.PaymentForAccountID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get credit card account: %w", err)
+	}
+
+	// Total amount needed = card balance (convert negative balance to positive)
+	totalNeeded := -account.Balance
+
+	paymentAlloc, err := s.allocationRepo.GetByCategoryAndPeriod(ctx, paymentCategoryID, period)
+	if err != nil {
+		// Create new allocation for payment category
+		// NOTE: Direct repository access is intentional - payment allocations are excluded from RTA
+		paymentAlloc = &domain.Allocation{
+			ID:         uuid.New().String(),
+			CategoryID: paymentCategoryID,
+			Amount:     totalNeeded, // Set to card balance
+			Period:     period,
+			Notes:      "Transferred from expense categories",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+		if err := s.allocationRepo.Create(ctx, paymentAlloc); err != nil {
+			return nil, 0, fmt.Errorf("failed to create payment allocation: %w", err)
+		}
+	} else {
+		// Update existing payment allocation to match card balance
+		paymentAlloc.Amount = totalNeeded // Set to card balance (not adding)
+		paymentAlloc.UpdatedAt = time.Now()
+		if err := s.allocationRepo.Update(ctx, paymentAlloc); err != nil {
+			return nil, 0, fmt.Errorf("failed to update payment allocation: %w", err)
+		}
+	}
+
+	return paymentAlloc, underfundedAmount, nil
 }
 
 // GetAllocation retrieves an allocation by ID
@@ -342,23 +429,23 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 		return 0, fmt.Errorf("failed to list allocations: %w", err)
 	}
 
-	// Get all categories to check which are payment categories
-	allCategories, err := s.categoryRepo.List(ctx)
+	// Get all categories to identify payment categories
+	categories, err := s.categoryRepo.List(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list categories: %w", err)
 	}
 
 	// Build map of payment category IDs
 	paymentCategoryIDs := make(map[string]bool)
-	for _, cat := range allCategories {
+	for _, cat := range categories {
 		if cat.PaymentForAccountID != nil && *cat.PaymentForAccountID != "" {
 			paymentCategoryIDs[cat.ID] = true
 		}
 	}
 
 	// Calculate total allocations through this period
-	// EXCLUDE payment category allocations - they don't represent "new" money allocation
-	// Payment allocations just track CC debt covered by expense budgets
+	// EXCLUDE payment category allocations - they represent money transferred from expense categories,
+	// not new money allocated from RTA
 	var totalAllocations int64
 	for _, alloc := range allAllocations {
 		if alloc.Period <= period && !paymentCategoryIDs[alloc.CategoryID] {
@@ -370,20 +457,11 @@ func (s *AllocationService) CalculateReadyToAssignForPeriod(ctx context.Context,
 	// This can be negative if you over-allocated!
 	// When you categorize unbudgeted spending, categories go negative (overspent).
 	// You must then allocate money to cover the overspending, reducing RTA.
+	//
+	// Payment category allocations are included in total allocations.
+	// Underfunded credit cards will show warnings in the UI, but don't automatically
+	// reduce RTA - you must manually allocate to cover them.
 	readyToAssign := totalInflows - totalAllocations
-
-	// Check for underfunded credit cards and subtract their shortfalls
-	// This ensures the indicator reflects CC debt that isn't properly covered
-	summaries, err := s.GetAllocationSummary(ctx, period)
-	if err == nil {
-		for _, summary := range summaries {
-			if summary.Underfunded != nil && *summary.Underfunded > 0 {
-				// Reduce ready to assign by the underfunded amount
-				// This makes underfunded CC spending equivalent to over-allocation
-				readyToAssign -= *summary.Underfunded
-			}
-		}
-	}
 
 	return readyToAssign, nil
 }

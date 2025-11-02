@@ -344,7 +344,7 @@ function renderBudgetCategory(category, summary) {
                         ? `<div class="text-red-500 dark:text-red-400 text-xs mt-1">Contributing categories: ${summaryItem.underfunded_categories.join(', ')}</div>`
                         : ''}
                 </div>
-                <button onclick="event.stopPropagation(); allocateToCoverUnderfunded('${category.id}', '${category.name.replace(/'/g, "\\'")}', ${summaryItem.underfunded})"
+                <button onclick="event.stopPropagation(); allocateToCoverUnderfunded(this, '${category.id}', '${category.name.replace(/'/g, "\\'")}', ${summaryItem.underfunded})"
                         class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-medium whitespace-nowrap transition-colors no-drag"
                         title="Allocate from Ready to Assign to cover this underfunded amount">
                     Allocate to Cover
@@ -1168,7 +1168,10 @@ async function startInlineEdit(categoryId, categoryName, currentAmount) {
 }
 
 // Allocate to cover underfunded payment category
-async function allocateToCoverUnderfunded(categoryId, categoryName, underfundedAmount) {
+async function allocateToCoverUnderfunded(button, categoryId, categoryName, underfundedAmount) {
+    // Save button reference and original text
+    const originalText = button.textContent;
+
     // Get current period
     const period = getCurrentPeriod();
 
@@ -1194,8 +1197,6 @@ async function allocateToCoverUnderfunded(categoryId, categoryName, underfundedA
 
     try {
         // Show loading state
-        const button = event.target;
-        const originalText = button.textContent;
         button.textContent = 'Allocating...';
         button.disabled = true;
 

@@ -1,0 +1,1295 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - heading "🐷 Piggy Bank Pals" [level=1] [ref=e5]
+      - generic [ref=e6]:
+        - button "Import" [ref=e7] [cursor=pointer]
+        - button "🌙" [ref=e8] [cursor=pointer]
+        - button "+ Add Transaction" [ref=e9] [cursor=pointer]
+        - button "Transfer" [ref=e10] [cursor=pointer]
+  - generic [ref=e11]:
+    - complementary [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - heading "Accounts" [level=3] [ref=e17]
+            - button "+ Add" [ref=e18] [cursor=pointer]
+          - generic [ref=e19]:
+            - generic [ref=e20] [cursor=pointer]:
+              - generic [ref=e21]: All Accounts
+              - generic [ref=e22]: $80,700.00
+            - generic [ref=e23] [cursor=pointer]:
+              - generic [ref=e24]:
+                - generic [ref=e25]: Test Credit Card
+                - generic [ref=e26]: checking
+              - generic [ref=e27]: "-$500.00"
+            - generic [ref=e28] [cursor=pointer]:
+              - generic [ref=e29]:
+                - generic [ref=e30]: Test Checking
+                - generic [ref=e31]: checking
+              - generic [ref=e32]: $200.00
+            - generic [ref=e33] [cursor=pointer]:
+              - generic [ref=e34]:
+                - generic [ref=e35]: Test Credit Card
+                - generic [ref=e36]: checking
+              - generic [ref=e37]: "-$200.00"
+            - generic [ref=e38] [cursor=pointer]:
+              - generic [ref=e39]:
+                - generic [ref=e40]: Test Checking
+                - generic [ref=e41]: checking
+              - generic [ref=e42]: $5,000.00
+            - generic [ref=e43] [cursor=pointer]:
+              - generic [ref=e44]:
+                - generic [ref=e45]: Test Credit Card
+                - generic [ref=e46]: checking
+              - generic [ref=e47]: "-$200.00"
+            - generic [ref=e48] [cursor=pointer]:
+              - generic [ref=e49]:
+                - generic [ref=e50]: Test Checking
+                - generic [ref=e51]: checking
+              - generic [ref=e52]: $5,000.00
+            - generic [ref=e53] [cursor=pointer]:
+              - generic [ref=e54]:
+                - generic [ref=e55]: Test Credit Card
+                - generic [ref=e56]: checking
+              - generic [ref=e57]: "-$200.00"
+            - generic [ref=e58] [cursor=pointer]:
+              - generic [ref=e59]:
+                - generic [ref=e60]: Test Checking
+                - generic [ref=e61]: checking
+              - generic [ref=e62]: $5,000.00
+            - generic [ref=e63] [cursor=pointer]:
+              - generic [ref=e64]:
+                - generic [ref=e65]: Test Credit Card
+                - generic [ref=e66]: checking
+              - generic [ref=e67]: "-$500.00"
+            - generic [ref=e68] [cursor=pointer]:
+              - generic [ref=e69]:
+                - generic [ref=e70]: Test Checking
+                - generic [ref=e71]: checking
+              - generic [ref=e72]: $5,000.00
+            - generic [ref=e73] [cursor=pointer]:
+              - generic [ref=e74]:
+                - generic [ref=e75]: Test Credit Card
+                - generic [ref=e76]: checking
+              - generic [ref=e77]: "-$200.00"
+            - generic [ref=e78] [cursor=pointer]:
+              - generic [ref=e79]:
+                - generic [ref=e80]: Test Checking
+                - generic [ref=e81]: checking
+              - generic [ref=e82]: $5,000.00
+            - generic [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]:
+                - generic [ref=e85]: Test Credit Card
+                - generic [ref=e86]: checking
+              - generic [ref=e87]: "-$300.00"
+            - generic [ref=e88] [cursor=pointer]:
+              - generic [ref=e89]:
+                - generic [ref=e90]: Test Checking
+                - generic [ref=e91]: checking
+              - generic [ref=e92]: $5,000.00
+            - generic [ref=e93] [cursor=pointer]:
+              - generic [ref=e94]:
+                - generic [ref=e95]: Test Credit Card
+                - generic [ref=e96]: checking
+              - generic [ref=e97]: "-$375.00"
+            - generic [ref=e98] [cursor=pointer]:
+              - generic [ref=e99]:
+                - generic [ref=e100]: Test Checking
+                - generic [ref=e101]: checking
+              - generic [ref=e102]: $5,000.00
+            - generic [ref=e103] [cursor=pointer]:
+              - generic [ref=e104]:
+                - generic [ref=e105]: Test Credit Card 2
+                - generic [ref=e106]: checking
+              - generic [ref=e107]: "-$400.00"
+            - generic [ref=e108] [cursor=pointer]:
+              - generic [ref=e109]:
+                - generic [ref=e110]: Test Credit Card 1
+                - generic [ref=e111]: checking
+              - generic [ref=e112]: "-$300.00"
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]:
+                - generic [ref=e115]: Test Checking
+                - generic [ref=e116]: checking
+              - generic [ref=e117]: $10,000.00
+            - generic [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]:
+                - generic [ref=e120]: Test Credit Card
+                - generic [ref=e121]: checking
+              - generic [ref=e122]: "-$500.00"
+            - generic [ref=e123] [cursor=pointer]:
+              - generic [ref=e124]:
+                - generic [ref=e125]: Test Checking
+                - generic [ref=e126]: checking
+              - generic [ref=e127]: $200.00
+            - generic [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]:
+                - generic [ref=e130]: Test Credit Card
+                - generic [ref=e131]: checking
+              - generic [ref=e132]: "-$200.00"
+            - generic [ref=e133] [cursor=pointer]:
+              - generic [ref=e134]:
+                - generic [ref=e135]: Test Checking
+                - generic [ref=e136]: checking
+              - generic [ref=e137]: $5,000.00
+            - generic [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]:
+                - generic [ref=e140]: Test Credit Card
+                - generic [ref=e141]: checking
+              - generic [ref=e142]: "-$200.00"
+            - generic [ref=e143] [cursor=pointer]:
+              - generic [ref=e144]:
+                - generic [ref=e145]: Test Checking
+                - generic [ref=e146]: checking
+              - generic [ref=e147]: $5,000.00
+            - generic [ref=e148] [cursor=pointer]:
+              - generic [ref=e149]:
+                - generic [ref=e150]: Test Credit Card
+                - generic [ref=e151]: checking
+              - generic [ref=e152]: "-$200.00"
+            - generic [ref=e153] [cursor=pointer]:
+              - generic [ref=e154]:
+                - generic [ref=e155]: Test Checking
+                - generic [ref=e156]: checking
+              - generic [ref=e157]: $5,000.00
+            - generic [ref=e158] [cursor=pointer]:
+              - generic [ref=e159]:
+                - generic [ref=e160]: Test Checking
+                - generic [ref=e161]: checking
+              - generic [ref=e162]: $0.00
+            - generic [ref=e163] [cursor=pointer]:
+              - generic [ref=e164]:
+                - generic [ref=e165]: Test Credit Card
+                - generic [ref=e166]: checking
+              - generic [ref=e167]: "-$200.00"
+            - generic [ref=e168] [cursor=pointer]:
+              - generic [ref=e169]:
+                - generic [ref=e170]: Test Checking
+                - generic [ref=e171]: checking
+              - generic [ref=e172]: $5,000.00
+            - generic [ref=e173] [cursor=pointer]:
+              - generic [ref=e174]:
+                - generic [ref=e175]: Test Credit Card
+                - generic [ref=e176]: checking
+              - generic [ref=e177]: "-$300.00"
+            - generic [ref=e178] [cursor=pointer]:
+              - generic [ref=e179]:
+                - generic [ref=e180]: Test Checking
+                - generic [ref=e181]: checking
+              - generic [ref=e182]: $5,000.00
+            - generic [ref=e183] [cursor=pointer]:
+              - generic [ref=e184]:
+                - generic [ref=e185]: Test Credit Card
+                - generic [ref=e186]: checking
+              - generic [ref=e187]: "-$375.00"
+            - generic [ref=e188] [cursor=pointer]:
+              - generic [ref=e189]:
+                - generic [ref=e190]: Test Checking
+                - generic [ref=e191]: checking
+              - generic [ref=e192]: $5,000.00
+            - generic [ref=e193] [cursor=pointer]:
+              - generic [ref=e194]:
+                - generic [ref=e195]: Test Checking
+                - generic [ref=e196]: checking
+              - generic [ref=e197]: $0.00
+            - generic [ref=e198] [cursor=pointer]:
+              - generic [ref=e199]:
+                - generic [ref=e200]: Test Checking
+                - generic [ref=e201]: checking
+              - generic [ref=e202]: $0.00
+            - generic [ref=e203] [cursor=pointer]:
+              - generic [ref=e204]:
+                - generic [ref=e205]: Test Checking
+                - generic [ref=e206]: checking
+              - generic [ref=e207]: $0.00
+            - generic [ref=e208] [cursor=pointer]:
+              - generic [ref=e209]:
+                - generic [ref=e210]: Test Credit Card
+                - generic [ref=e211]: checking
+              - generic [ref=e212]: "-$200.00"
+            - generic [ref=e213] [cursor=pointer]:
+              - generic [ref=e214]:
+                - generic [ref=e215]: Test Checking
+                - generic [ref=e216]: checking
+              - generic [ref=e217]: $5,000.00
+            - generic [ref=e218] [cursor=pointer]:
+              - generic [ref=e219]:
+                - generic [ref=e220]: Test Credit Card
+                - generic [ref=e221]: checking
+              - generic [ref=e222]: "-$200.00"
+            - generic [ref=e223] [cursor=pointer]:
+              - generic [ref=e224]:
+                - generic [ref=e225]: Test Checking
+                - generic [ref=e226]: checking
+              - generic [ref=e227]: $5,000.00
+            - generic [ref=e228] [cursor=pointer]:
+              - generic [ref=e229]:
+                - generic [ref=e230]: Test Checking
+                - generic [ref=e231]: checking
+              - generic [ref=e232]: $0.00
+            - generic [ref=e233] [cursor=pointer]:
+              - generic [ref=e234]:
+                - generic [ref=e235]: Test Checking
+                - generic [ref=e236]: checking
+              - generic [ref=e237]: $0.00
+            - generic [ref=e238] [cursor=pointer]:
+              - generic [ref=e239]:
+                - generic [ref=e240]: Test Checking
+                - generic [ref=e241]: checking
+              - generic [ref=e242]: $0.00
+            - generic [ref=e243] [cursor=pointer]:
+              - generic [ref=e244]:
+                - generic [ref=e245]: Test Checking
+                - generic [ref=e246]: checking
+              - generic [ref=e247]: $0.00
+            - generic [ref=e248] [cursor=pointer]:
+              - generic [ref=e249]:
+                - generic [ref=e250]: Test Checking
+                - generic [ref=e251]: checking
+              - generic [ref=e252]: $0.00
+            - generic [ref=e253] [cursor=pointer]:
+              - generic [ref=e254]:
+                - generic [ref=e255]: Test Checking
+                - generic [ref=e256]: checking
+              - generic [ref=e257]: $0.00
+            - generic [ref=e258] [cursor=pointer]:
+              - generic [ref=e259]:
+                - generic [ref=e260]: Test Checking
+                - generic [ref=e261]: checking
+              - generic [ref=e262]: $0.00
+            - generic [ref=e263] [cursor=pointer]:
+              - generic [ref=e264]:
+                - generic [ref=e265]: Test Checking
+                - generic [ref=e266]: checking
+              - generic [ref=e267]: $0.00
+            - generic [ref=e268] [cursor=pointer]:
+              - generic [ref=e269]:
+                - generic [ref=e270]: Test Checking
+                - generic [ref=e271]: checking
+              - generic [ref=e272]: $0.00
+            - generic [ref=e273] [cursor=pointer]:
+              - generic [ref=e274]:
+                - generic [ref=e275]: Chase Sapphire
+                - generic [ref=e276]: credit
+              - generic [ref=e277]: Owe $50.00
+            - generic [ref=e278] [cursor=pointer]:
+              - generic [ref=e279]:
+                - generic [ref=e280]: OnPoint Checking
+                - generic [ref=e281]: checking
+              - generic [ref=e282]: $900.00
+        - generic [ref=e283]:
+          - heading "Recent Activity" [level=3] [ref=e284]
+          - generic [ref=e285]:
+            - heading "Uncategorized" [level=4] [ref=e287]: Uncategorized
+            - paragraph [ref=e289]: All caught up!
+          - generic [ref=e290]:
+            - heading "Recent" [level=4] [ref=e291]
+            - generic [ref=e292]:
+              - generic [ref=e293]:
+                - generic [ref=e294]:
+                  - generic "Groceries" [ref=e295]
+                  - generic [ref=e296]: "-$500.00"
+                - generic [ref=e299]: Groceries
+              - generic [ref=e300]:
+                - generic [ref=e301]:
+                  - generic "Income" [ref=e302]
+                  - generic [ref=e303]: $200.00
+                - generic [ref=e306]: Salary
+              - generic [ref=e307]:
+                - generic [ref=e308]:
+                  - generic "Groceries" [ref=e309]
+                  - generic [ref=e310]: "-$200.00"
+                - generic [ref=e313]: Groceries
+              - generic [ref=e314]:
+                - generic [ref=e315]:
+                  - generic "Income" [ref=e316]
+                  - generic [ref=e317]: $5,000.00
+                - generic [ref=e320]: Salary
+              - generic [ref=e321]:
+                - generic [ref=e322]:
+                  - generic "Groceries" [ref=e323]
+                  - generic [ref=e324]: "-$200.00"
+                - generic [ref=e327]: Groceries
+              - generic [ref=e328]:
+                - generic [ref=e329]:
+                  - generic "Income" [ref=e330]
+                  - generic [ref=e331]: $5,000.00
+                - generic [ref=e334]: Salary
+              - generic [ref=e335]:
+                - generic [ref=e336]:
+                  - generic "Groceries" [ref=e337]
+                  - generic [ref=e338]: "-$200.00"
+                - generic [ref=e341]: Groceries
+              - generic [ref=e342]:
+                - generic [ref=e343]:
+                  - generic "Income" [ref=e344]
+                  - generic [ref=e345]: $5,000.00
+                - generic [ref=e348]: Salary
+              - generic [ref=e349]:
+                - generic [ref=e350]:
+                  - generic "Gas" [ref=e351]
+                  - generic [ref=e352]: "-$500.00"
+                - generic [ref=e355]: Gas
+              - generic [ref=e356]:
+                - generic [ref=e357]:
+                  - generic "Income" [ref=e358]
+                  - generic [ref=e359]: $5,000.00
+                - generic [ref=e362]: Salary
+    - main [ref=e363]:
+      - generic [ref=e365]:
+        - generic [ref=e366]:
+          - heading "Budget - November 2025" [level=2] [ref=e367]
+          - generic [ref=e368]:
+            - button "← Previous" [ref=e369] [cursor=pointer]
+            - button "Next →" [ref=e370] [cursor=pointer]
+        - generic [ref=e371]:
+          - generic [ref=e372]: Ready to Assign
+          - generic [ref=e374]: $93,450.00
+          - generic [ref=e375]: Money available to allocate to categories
+        - generic [ref=e376]:
+          - heading "Categories" [level=3] [ref=e377]
+          - generic [ref=e378]:
+            - button "Collapse All" [active] [ref=e379] [cursor=pointer]
+            - button "+ Add Group" [ref=e380] [cursor=pointer]
+        - generic [ref=e381]:
+          - generic [ref=e382]:
+            - generic [ref=e384] [cursor=pointer]:
+              - generic [ref=e385]: ▼
+              - generic "Drag to reorder" [ref=e386]: ⋮⋮
+              - heading "Credit Card Payments" [level=3] [ref=e387]:
+                - generic [ref=e388]: Credit Card Payments
+            - generic [ref=e394]:
+              - generic [ref=e395]:
+                - generic [ref=e396]: ⋮⋮
+                - generic [ref=e399]: Chase Sapphire Payment
+              - generic [ref=e400]:
+                - generic [ref=e401]:
+                  - generic [ref=e402]: Card Balance
+                  - generic [ref=e403]: $50.00
+                - generic [ref=e404]:
+                  - generic [ref=e405]: Allocated
+                  - generic "Auto-allocated" [ref=e406]: $150.00
+                - generic [ref=e407]:
+                  - generic [ref=e408]: Paid
+                  - generic [ref=e409]: $0.00
+                - generic [ref=e410]:
+                  - generic [ref=e411]: Available
+                  - generic [ref=e412]: $150.00
+          - generic [ref=e414]:
+            - generic [ref=e415] [cursor=pointer]:
+              - generic [ref=e416]:
+                - generic [ref=e417]: ▼
+                - generic "Drag to reorder" [ref=e418]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e419]:
+                  - generic "Click to edit group name" [ref=e420]: Test Categories
+              - button "✕" [ref=e422]
+            - generic [ref=e423]:
+              - generic [ref=e424]:
+                - generic [ref=e426]:
+                  - generic [ref=e427]:
+                    - generic [ref=e428]: ⋮⋮
+                    - generic [ref=e431]: Groceries
+                  - generic [ref=e432]:
+                    - generic [ref=e433]:
+                      - generic [ref=e434]: Allocated
+                      - generic "Click to edit" [ref=e435] [cursor=pointer]: $0.00
+                    - generic [ref=e436]:
+                      - generic [ref=e437]: Spent
+                      - generic [ref=e438]: $200.00
+                    - generic [ref=e439]:
+                      - generic [ref=e440]: Available
+                      - generic [ref=e441]: "-$200.00"
+                    - button "✕" [ref=e442] [cursor=pointer]
+                - generic [ref=e444]:
+                  - generic [ref=e445]:
+                    - generic [ref=e446]: ⋮⋮
+                    - generic [ref=e449]: Salary
+                  - generic [ref=e450]:
+                    - generic [ref=e451]:
+                      - generic [ref=e452]: Allocated
+                      - generic "Click to edit" [ref=e453] [cursor=pointer]: $0.00
+                    - generic [ref=e454]:
+                      - generic [ref=e455]: Spent
+                      - generic [ref=e456]: "-$5,000.00"
+                    - generic [ref=e457]:
+                      - generic [ref=e458]: Available
+                      - generic [ref=e459]: $5,000.00
+                    - button "✕" [ref=e460] [cursor=pointer]
+              - button "+ Add Category" [ref=e461] [cursor=pointer]
+          - generic [ref=e462]:
+            - generic [ref=e463] [cursor=pointer]:
+              - generic [ref=e464]:
+                - generic [ref=e465]: ▼
+                - generic "Drag to reorder" [ref=e466]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e467]:
+                  - generic "Click to edit group name" [ref=e468]: Test Categories
+              - button "✕" [ref=e470]
+            - generic [ref=e471]:
+              - generic [ref=e472]:
+                - generic [ref=e474]:
+                  - generic [ref=e475]:
+                    - generic [ref=e476]: ⋮⋮
+                    - generic [ref=e479]: Groceries
+                  - generic [ref=e480]:
+                    - generic [ref=e481]:
+                      - generic [ref=e482]: Allocated
+                      - generic "Click to edit" [ref=e483] [cursor=pointer]: $0.00
+                    - generic [ref=e484]:
+                      - generic [ref=e485]: Spent
+                      - generic [ref=e486]: $200.00
+                    - generic [ref=e487]:
+                      - generic [ref=e488]: Available
+                      - generic [ref=e489]: "-$200.00"
+                    - button "✕" [ref=e490] [cursor=pointer]
+                - generic [ref=e492]:
+                  - generic [ref=e493]:
+                    - generic [ref=e494]: ⋮⋮
+                    - generic [ref=e497]: Salary
+                  - generic [ref=e498]:
+                    - generic [ref=e499]:
+                      - generic [ref=e500]: Allocated
+                      - generic "Click to edit" [ref=e501] [cursor=pointer]: $0.00
+                    - generic [ref=e502]:
+                      - generic [ref=e503]: Spent
+                      - generic [ref=e504]: "-$5,000.00"
+                    - generic [ref=e505]:
+                      - generic [ref=e506]: Available
+                      - generic [ref=e507]: $5,000.00
+                    - button "✕" [ref=e508] [cursor=pointer]
+              - button "+ Add Category" [ref=e509] [cursor=pointer]
+          - generic [ref=e510]:
+            - generic [ref=e511] [cursor=pointer]:
+              - generic [ref=e512]:
+                - generic [ref=e513]: ▼
+                - generic "Drag to reorder" [ref=e514]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e515]:
+                  - generic "Click to edit group name" [ref=e516]: Test Categories
+              - button "✕" [ref=e518]
+            - generic [ref=e519]:
+              - generic [ref=e520]:
+                - generic [ref=e522]:
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: ⋮⋮
+                    - generic [ref=e527]: Groceries
+                  - generic [ref=e528]:
+                    - generic [ref=e529]:
+                      - generic [ref=e530]: Allocated
+                      - generic "Click to edit" [ref=e531] [cursor=pointer]: $0.00
+                    - generic [ref=e532]:
+                      - generic [ref=e533]: Spent
+                      - generic [ref=e534]: $200.00
+                    - generic [ref=e535]:
+                      - generic [ref=e536]: Available
+                      - generic [ref=e537]: "-$200.00"
+                    - button "✕" [ref=e538] [cursor=pointer]
+                - generic [ref=e540]:
+                  - generic [ref=e541]:
+                    - generic [ref=e542]: ⋮⋮
+                    - generic [ref=e545]: Salary
+                  - generic [ref=e546]:
+                    - generic [ref=e547]:
+                      - generic [ref=e548]: Allocated
+                      - generic "Click to edit" [ref=e549] [cursor=pointer]: $0.00
+                    - generic [ref=e550]:
+                      - generic [ref=e551]: Spent
+                      - generic [ref=e552]: "-$5,000.00"
+                    - generic [ref=e553]:
+                      - generic [ref=e554]: Available
+                      - generic [ref=e555]: $5,000.00
+                    - button "✕" [ref=e556] [cursor=pointer]
+              - button "+ Add Category" [ref=e557] [cursor=pointer]
+          - generic [ref=e558]:
+            - generic [ref=e559] [cursor=pointer]:
+              - generic [ref=e560]:
+                - generic [ref=e561]: ▼
+                - generic "Drag to reorder" [ref=e562]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e563]:
+                  - generic "Click to edit group name" [ref=e564]: Test Categories
+              - button "✕" [ref=e566]
+            - generic [ref=e567]:
+              - generic [ref=e568]:
+                - generic [ref=e570]:
+                  - generic [ref=e571]:
+                    - generic [ref=e572]: ⋮⋮
+                    - generic [ref=e575]: Gas
+                  - generic [ref=e576]:
+                    - generic [ref=e577]:
+                      - generic [ref=e578]: Allocated
+                      - generic "Click to edit" [ref=e579] [cursor=pointer]: $100.00
+                    - generic [ref=e580]:
+                      - generic [ref=e581]: Spent
+                      - generic [ref=e582]: $0.00
+                    - generic [ref=e583]:
+                      - generic [ref=e584]: Available
+                      - generic [ref=e585]: $100.00
+                    - button "✕" [ref=e586] [cursor=pointer]
+                - generic [ref=e588]:
+                  - generic [ref=e589]:
+                    - generic [ref=e590]: ⋮⋮
+                    - generic [ref=e593]: Groceries
+                  - generic [ref=e594]:
+                    - generic [ref=e595]:
+                      - generic [ref=e596]: Allocated
+                      - generic "Click to edit" [ref=e597] [cursor=pointer]: $0.00
+                    - generic [ref=e598]:
+                      - generic [ref=e599]: Spent
+                      - generic [ref=e600]: $500.00
+                    - generic [ref=e601]:
+                      - generic [ref=e602]: Available
+                      - generic [ref=e603]: "-$500.00"
+                    - button "✕" [ref=e604] [cursor=pointer]
+                - generic [ref=e606]:
+                  - generic [ref=e607]:
+                    - generic [ref=e608]: ⋮⋮
+                    - generic [ref=e611]: Salary
+                  - generic [ref=e612]:
+                    - generic [ref=e613]:
+                      - generic [ref=e614]: Allocated
+                      - generic "Click to edit" [ref=e615] [cursor=pointer]: $0.00
+                    - generic [ref=e616]:
+                      - generic [ref=e617]: Spent
+                      - generic [ref=e618]: "-$200.00"
+                    - generic [ref=e619]:
+                      - generic [ref=e620]: Available
+                      - generic [ref=e621]: $200.00
+                    - button "✕" [ref=e622] [cursor=pointer]
+              - button "+ Add Category" [ref=e623] [cursor=pointer]
+          - generic [ref=e624]:
+            - generic [ref=e625] [cursor=pointer]:
+              - generic [ref=e626]:
+                - generic [ref=e627]: ▼
+                - generic "Drag to reorder" [ref=e628]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e629]:
+                  - generic "Click to edit group name" [ref=e630]: Test Categories
+              - button "✕" [ref=e632]
+            - generic [ref=e633]:
+              - generic [ref=e634]:
+                - generic [ref=e636]:
+                  - generic [ref=e637]:
+                    - generic [ref=e638]: ⋮⋮
+                    - generic [ref=e641]: Gas
+                  - generic [ref=e642]:
+                    - generic [ref=e643]:
+                      - generic [ref=e644]: Allocated
+                      - generic "Click to edit" [ref=e645] [cursor=pointer]: $0.00
+                    - generic [ref=e646]:
+                      - generic [ref=e647]: Spent
+                      - generic [ref=e648]: $400.00
+                    - generic [ref=e649]:
+                      - generic [ref=e650]: Available
+                      - generic [ref=e651]: "-$400.00"
+                    - button "✕" [ref=e652] [cursor=pointer]
+                - generic [ref=e654]:
+                  - generic [ref=e655]:
+                    - generic [ref=e656]: ⋮⋮
+                    - generic [ref=e659]: Groceries
+                  - generic [ref=e660]:
+                    - generic [ref=e661]:
+                      - generic [ref=e662]: Allocated
+                      - generic "Click to edit" [ref=e663] [cursor=pointer]: $0.00
+                    - generic [ref=e664]:
+                      - generic [ref=e665]: Spent
+                      - generic [ref=e666]: $300.00
+                    - generic [ref=e667]:
+                      - generic [ref=e668]: Available
+                      - generic [ref=e669]: "-$300.00"
+                    - button "✕" [ref=e670] [cursor=pointer]
+                - generic [ref=e672]:
+                  - generic [ref=e673]:
+                    - generic [ref=e674]: ⋮⋮
+                    - generic [ref=e677]: Salary
+                  - generic [ref=e678]:
+                    - generic [ref=e679]:
+                      - generic [ref=e680]: Allocated
+                      - generic "Click to edit" [ref=e681] [cursor=pointer]: $0.00
+                    - generic [ref=e682]:
+                      - generic [ref=e683]: Spent
+                      - generic [ref=e684]: "-$10,000.00"
+                    - generic [ref=e685]:
+                      - generic [ref=e686]: Available
+                      - generic [ref=e687]: $10,000.00
+                    - button "✕" [ref=e688] [cursor=pointer]
+              - button "+ Add Category" [ref=e689] [cursor=pointer]
+          - generic [ref=e690]:
+            - generic [ref=e691] [cursor=pointer]:
+              - generic [ref=e692]:
+                - generic [ref=e693]: ▼
+                - generic "Drag to reorder" [ref=e694]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e695]:
+                  - generic "Click to edit group name" [ref=e696]: Test Categories
+              - button "✕" [ref=e698]
+            - generic [ref=e699]:
+              - generic [ref=e700]:
+                - generic [ref=e702]:
+                  - generic [ref=e703]:
+                    - generic [ref=e704]: ⋮⋮
+                    - generic [ref=e707]: Dining
+                  - generic [ref=e708]:
+                    - generic [ref=e709]:
+                      - generic [ref=e710]: Allocated
+                      - generic "Click to edit" [ref=e711] [cursor=pointer]: $0.00
+                    - generic [ref=e712]:
+                      - generic [ref=e713]: Spent
+                      - generic [ref=e714]: $125.00
+                    - generic [ref=e715]:
+                      - generic [ref=e716]: Available
+                      - generic [ref=e717]: "-$125.00"
+                    - button "✕" [ref=e718] [cursor=pointer]
+                - generic [ref=e720]:
+                  - generic [ref=e721]:
+                    - generic [ref=e722]: ⋮⋮
+                    - generic [ref=e725]: Gas
+                  - generic [ref=e726]:
+                    - generic [ref=e727]:
+                      - generic [ref=e728]: Allocated
+                      - generic "Click to edit" [ref=e729] [cursor=pointer]: $0.00
+                    - generic [ref=e730]:
+                      - generic [ref=e731]: Spent
+                      - generic [ref=e732]: $100.00
+                    - generic [ref=e733]:
+                      - generic [ref=e734]: Available
+                      - generic [ref=e735]: "-$100.00"
+                    - button "✕" [ref=e736] [cursor=pointer]
+                - generic [ref=e738]:
+                  - generic [ref=e739]:
+                    - generic [ref=e740]: ⋮⋮
+                    - generic [ref=e743]: Groceries
+                  - generic [ref=e744]:
+                    - generic [ref=e745]:
+                      - generic [ref=e746]: Allocated
+                      - generic "Click to edit" [ref=e747] [cursor=pointer]: $0.00
+                    - generic [ref=e748]:
+                      - generic [ref=e749]: Spent
+                      - generic [ref=e750]: $150.00
+                    - generic [ref=e751]:
+                      - generic [ref=e752]: Available
+                      - generic [ref=e753]: "-$150.00"
+                    - button "✕" [ref=e754] [cursor=pointer]
+                - generic [ref=e756]:
+                  - generic [ref=e757]:
+                    - generic [ref=e758]: ⋮⋮
+                    - generic [ref=e761]: Salary
+                  - generic [ref=e762]:
+                    - generic [ref=e763]:
+                      - generic [ref=e764]: Allocated
+                      - generic "Click to edit" [ref=e765] [cursor=pointer]: $0.00
+                    - generic [ref=e766]:
+                      - generic [ref=e767]: Spent
+                      - generic [ref=e768]: "-$5,000.00"
+                    - generic [ref=e769]:
+                      - generic [ref=e770]: Available
+                      - generic [ref=e771]: $5,000.00
+                    - button "✕" [ref=e772] [cursor=pointer]
+              - button "+ Add Category" [ref=e773] [cursor=pointer]
+          - generic [ref=e774]:
+            - generic [ref=e775] [cursor=pointer]:
+              - generic [ref=e776]:
+                - generic [ref=e777]: ▼
+                - generic "Drag to reorder" [ref=e778]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e779]:
+                  - generic "Click to edit group name" [ref=e780]: Test Categories
+              - button "✕" [ref=e782]
+            - generic [ref=e783]:
+              - generic [ref=e786]:
+                - generic [ref=e787]:
+                  - generic [ref=e788]: ⋮⋮
+                  - generic [ref=e791]: Groceries
+                - generic [ref=e792]:
+                  - generic [ref=e793]:
+                    - generic [ref=e794]: Allocated
+                    - generic "Click to edit" [ref=e795] [cursor=pointer]: $500.00
+                  - generic [ref=e796]:
+                    - generic [ref=e797]: Spent
+                    - generic [ref=e798]: $0.00
+                  - generic [ref=e799]:
+                    - generic [ref=e800]: Available
+                    - generic [ref=e801]: $500.00
+                  - button "✕" [ref=e802] [cursor=pointer]
+              - button "+ Add Category" [ref=e803] [cursor=pointer]
+          - generic [ref=e804]:
+            - generic [ref=e805] [cursor=pointer]:
+              - generic [ref=e806]:
+                - generic [ref=e807]: ▼
+                - generic "Drag to reorder" [ref=e808]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e809]:
+                  - generic "Click to edit group name" [ref=e810]: Test Categories
+              - button "✕" [ref=e812]
+            - generic [ref=e813]:
+              - generic [ref=e814]:
+                - generic [ref=e816]:
+                  - generic [ref=e817]:
+                    - generic [ref=e818]: ⋮⋮
+                    - generic [ref=e821]: Groceries
+                  - generic [ref=e822]:
+                    - generic [ref=e823]:
+                      - generic [ref=e824]: Allocated
+                      - generic "Click to edit" [ref=e825] [cursor=pointer]: $0.00
+                    - generic [ref=e826]:
+                      - generic [ref=e827]: Spent
+                      - generic [ref=e828]: $300.00
+                    - generic [ref=e829]:
+                      - generic [ref=e830]: Available
+                      - generic [ref=e831]: "-$300.00"
+                    - button "✕" [ref=e832] [cursor=pointer]
+                - generic [ref=e834]:
+                  - generic [ref=e835]:
+                    - generic [ref=e836]: ⋮⋮
+                    - generic [ref=e839]: Salary
+                  - generic [ref=e840]:
+                    - generic [ref=e841]:
+                      - generic [ref=e842]: Allocated
+                      - generic "Click to edit" [ref=e843] [cursor=pointer]: $0.00
+                    - generic [ref=e844]:
+                      - generic [ref=e845]: Spent
+                      - generic [ref=e846]: "-$5,000.00"
+                    - generic [ref=e847]:
+                      - generic [ref=e848]: Available
+                      - generic [ref=e849]: $5,000.00
+                    - button "✕" [ref=e850] [cursor=pointer]
+              - button "+ Add Category" [ref=e851] [cursor=pointer]
+          - generic [ref=e852]:
+            - generic [ref=e853] [cursor=pointer]:
+              - generic [ref=e854]:
+                - generic [ref=e855]: ▼
+                - generic "Drag to reorder" [ref=e856]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e857]:
+                  - generic "Click to edit group name" [ref=e858]: Test Categories
+              - button "✕" [ref=e860]
+            - generic [ref=e861]:
+              - generic [ref=e862]:
+                - generic [ref=e864]:
+                  - generic [ref=e865]:
+                    - generic [ref=e866]: ⋮⋮
+                    - generic [ref=e869]: Groceries
+                  - generic [ref=e870]:
+                    - generic [ref=e871]:
+                      - generic [ref=e872]: Allocated
+                      - generic "Click to edit" [ref=e873] [cursor=pointer]: $0.00
+                    - generic [ref=e874]:
+                      - generic [ref=e875]: Spent
+                      - generic [ref=e876]: $200.00
+                    - generic [ref=e877]:
+                      - generic [ref=e878]: Available
+                      - generic [ref=e879]: "-$200.00"
+                    - button "✕" [ref=e880] [cursor=pointer]
+                - generic [ref=e882]:
+                  - generic [ref=e883]:
+                    - generic [ref=e884]: ⋮⋮
+                    - generic [ref=e887]: Salary
+                  - generic [ref=e888]:
+                    - generic [ref=e889]:
+                      - generic [ref=e890]: Allocated
+                      - generic "Click to edit" [ref=e891] [cursor=pointer]: $0.00
+                    - generic [ref=e892]:
+                      - generic [ref=e893]: Spent
+                      - generic [ref=e894]: "-$5,000.00"
+                    - generic [ref=e895]:
+                      - generic [ref=e896]: Available
+                      - generic [ref=e897]: $5,000.00
+                    - button "✕" [ref=e898] [cursor=pointer]
+              - button "+ Add Category" [ref=e899] [cursor=pointer]
+          - generic [ref=e900]:
+            - generic [ref=e901] [cursor=pointer]:
+              - generic [ref=e902]:
+                - generic [ref=e903]: ▼
+                - generic "Drag to reorder" [ref=e904]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e905]:
+                  - generic "Click to edit group name" [ref=e906]: Test Categories
+              - button "✕" [ref=e908]
+            - generic [ref=e909]:
+              - generic [ref=e910]:
+                - generic [ref=e912]:
+                  - generic [ref=e913]:
+                    - generic [ref=e914]: ⋮⋮
+                    - generic [ref=e917]: Gas
+                  - generic [ref=e918]:
+                    - generic [ref=e919]:
+                      - generic [ref=e920]: Allocated
+                      - generic "Click to edit" [ref=e921] [cursor=pointer]: $0.00
+                    - generic [ref=e922]:
+                      - generic [ref=e923]: Spent
+                      - generic [ref=e924]: $500.00
+                    - generic [ref=e925]:
+                      - generic [ref=e926]: Available
+                      - generic [ref=e927]: "-$500.00"
+                    - button "✕" [ref=e928] [cursor=pointer]
+                - generic [ref=e930]:
+                  - generic [ref=e931]:
+                    - generic [ref=e932]: ⋮⋮
+                    - generic [ref=e935]: Groceries
+                  - generic [ref=e936]:
+                    - generic [ref=e937]:
+                      - generic [ref=e938]: Allocated
+                      - generic "Click to edit" [ref=e939] [cursor=pointer]: $1,500.00
+                    - generic [ref=e940]:
+                      - generic [ref=e941]: Spent
+                      - generic [ref=e942]: $0.00
+                    - generic [ref=e943]:
+                      - generic [ref=e944]: Available
+                      - generic [ref=e945]: $1,500.00
+                    - button "✕" [ref=e946] [cursor=pointer]
+                - generic [ref=e948]:
+                  - generic [ref=e949]:
+                    - generic [ref=e950]: ⋮⋮
+                    - generic [ref=e953]: Salary
+                  - generic [ref=e954]:
+                    - generic [ref=e955]:
+                      - generic [ref=e956]: Allocated
+                      - generic "Click to edit" [ref=e957] [cursor=pointer]: $0.00
+                    - generic [ref=e958]:
+                      - generic [ref=e959]: Spent
+                      - generic [ref=e960]: "-$5,000.00"
+                    - generic [ref=e961]:
+                      - generic [ref=e962]: Available
+                      - generic [ref=e963]: $5,000.00
+                    - button "✕" [ref=e964] [cursor=pointer]
+              - button "+ Add Category" [ref=e965] [cursor=pointer]
+          - generic [ref=e966]:
+            - generic [ref=e967] [cursor=pointer]:
+              - generic [ref=e968]:
+                - generic [ref=e969]: ▼
+                - generic "Drag to reorder" [ref=e970]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e971]:
+                  - generic "Click to edit group name" [ref=e972]: Test Categories
+              - button "✕" [ref=e974]
+            - generic [ref=e975]:
+              - generic [ref=e976]:
+                - generic [ref=e978]:
+                  - generic [ref=e979]:
+                    - generic [ref=e980]: ⋮⋮
+                    - generic [ref=e983]: Groceries
+                  - generic [ref=e984]:
+                    - generic [ref=e985]:
+                      - generic [ref=e986]: Allocated
+                      - generic "Click to edit" [ref=e987] [cursor=pointer]: $0.00
+                    - generic [ref=e988]:
+                      - generic [ref=e989]: Spent
+                      - generic [ref=e990]: $200.00
+                    - generic [ref=e991]:
+                      - generic [ref=e992]: Available
+                      - generic [ref=e993]: "-$200.00"
+                    - button "✕" [ref=e994] [cursor=pointer]
+                - generic [ref=e996]:
+                  - generic [ref=e997]:
+                    - generic [ref=e998]: ⋮⋮
+                    - generic [ref=e1001]: Salary
+                  - generic [ref=e1002]:
+                    - generic [ref=e1003]:
+                      - generic [ref=e1004]: Allocated
+                      - generic "Click to edit" [ref=e1005] [cursor=pointer]: $0.00
+                    - generic [ref=e1006]:
+                      - generic [ref=e1007]: Spent
+                      - generic [ref=e1008]: "-$5,000.00"
+                    - generic [ref=e1009]:
+                      - generic [ref=e1010]: Available
+                      - generic [ref=e1011]: $5,000.00
+                    - button "✕" [ref=e1012] [cursor=pointer]
+              - button "+ Add Category" [ref=e1013] [cursor=pointer]
+          - generic [ref=e1014]:
+            - generic [ref=e1015] [cursor=pointer]:
+              - generic [ref=e1016]:
+                - generic [ref=e1017]: ▼
+                - generic "Drag to reorder" [ref=e1018]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e1019]:
+                  - generic "Click to edit group name" [ref=e1020]: Test Categories
+              - button "✕" [ref=e1022]
+            - generic [ref=e1023]:
+              - generic [ref=e1024]:
+                - generic [ref=e1026]:
+                  - generic [ref=e1027]:
+                    - generic [ref=e1028]: ⋮⋮
+                    - generic [ref=e1031]: Groceries
+                  - generic [ref=e1032]:
+                    - generic [ref=e1033]:
+                      - generic [ref=e1034]: Allocated
+                      - generic "Click to edit" [ref=e1035] [cursor=pointer]: $0.00
+                    - generic [ref=e1036]:
+                      - generic [ref=e1037]: Spent
+                      - generic [ref=e1038]: $200.00
+                    - generic [ref=e1039]:
+                      - generic [ref=e1040]: Available
+                      - generic [ref=e1041]: "-$200.00"
+                    - button "✕" [ref=e1042] [cursor=pointer]
+                - generic [ref=e1044]:
+                  - generic [ref=e1045]:
+                    - generic [ref=e1046]: ⋮⋮
+                    - generic [ref=e1049]: Salary
+                  - generic [ref=e1050]:
+                    - generic [ref=e1051]:
+                      - generic [ref=e1052]: Allocated
+                      - generic "Click to edit" [ref=e1053] [cursor=pointer]: $0.00
+                    - generic [ref=e1054]:
+                      - generic [ref=e1055]: Spent
+                      - generic [ref=e1056]: "-$5,000.00"
+                    - generic [ref=e1057]:
+                      - generic [ref=e1058]: Available
+                      - generic [ref=e1059]: $5,000.00
+                    - button "✕" [ref=e1060] [cursor=pointer]
+              - button "+ Add Category" [ref=e1061] [cursor=pointer]
+          - generic [ref=e1062]:
+            - generic [ref=e1063] [cursor=pointer]:
+              - generic [ref=e1064]:
+                - generic [ref=e1065]: ▼
+                - generic "Drag to reorder" [ref=e1066]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e1067]:
+                  - generic "Click to edit group name" [ref=e1068]: Test Categories
+              - button "✕" [ref=e1070]
+            - generic [ref=e1071]:
+              - generic [ref=e1072]:
+                - generic [ref=e1074]:
+                  - generic [ref=e1075]:
+                    - generic [ref=e1076]: ⋮⋮
+                    - generic [ref=e1079]: Groceries
+                  - generic [ref=e1080]:
+                    - generic [ref=e1081]:
+                      - generic [ref=e1082]: Allocated
+                      - generic "Click to edit" [ref=e1083] [cursor=pointer]: $0.00
+                    - generic [ref=e1084]:
+                      - generic [ref=e1085]: Spent
+                      - generic [ref=e1086]: $200.00
+                    - generic [ref=e1087]:
+                      - generic [ref=e1088]: Available
+                      - generic [ref=e1089]: "-$200.00"
+                    - button "✕" [ref=e1090] [cursor=pointer]
+                - generic [ref=e1092]:
+                  - generic [ref=e1093]:
+                    - generic [ref=e1094]: ⋮⋮
+                    - generic [ref=e1097]: Salary
+                  - generic [ref=e1098]:
+                    - generic [ref=e1099]:
+                      - generic [ref=e1100]: Allocated
+                      - generic "Click to edit" [ref=e1101] [cursor=pointer]: $0.00
+                    - generic [ref=e1102]:
+                      - generic [ref=e1103]: Spent
+                      - generic [ref=e1104]: "-$5,000.00"
+                    - generic [ref=e1105]:
+                      - generic [ref=e1106]: Available
+                      - generic [ref=e1107]: $5,000.00
+                    - button "✕" [ref=e1108] [cursor=pointer]
+              - button "+ Add Category" [ref=e1109] [cursor=pointer]
+          - generic [ref=e1110]:
+            - generic [ref=e1111] [cursor=pointer]:
+              - generic [ref=e1112]:
+                - generic [ref=e1113]: ▼
+                - generic "Drag to reorder" [ref=e1114]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e1115]:
+                  - generic "Click to edit group name" [ref=e1116]: Test Categories
+              - button "✕" [ref=e1118]
+            - generic [ref=e1119]:
+              - generic [ref=e1120]:
+                - generic [ref=e1122]:
+                  - generic [ref=e1123]:
+                    - generic [ref=e1124]: ⋮⋮
+                    - generic [ref=e1127]: Gas
+                  - generic [ref=e1128]:
+                    - generic [ref=e1129]:
+                      - generic [ref=e1130]: Allocated
+                      - generic "Click to edit" [ref=e1131] [cursor=pointer]: $100.00
+                    - generic [ref=e1132]:
+                      - generic [ref=e1133]: Spent
+                      - generic [ref=e1134]: $0.00
+                    - generic [ref=e1135]:
+                      - generic [ref=e1136]: Available
+                      - generic [ref=e1137]: $100.00
+                    - button "✕" [ref=e1138] [cursor=pointer]
+                - generic [ref=e1140]:
+                  - generic [ref=e1141]:
+                    - generic [ref=e1142]: ⋮⋮
+                    - generic [ref=e1145]: Groceries
+                  - generic [ref=e1146]:
+                    - generic [ref=e1147]:
+                      - generic [ref=e1148]: Allocated
+                      - generic "Click to edit" [ref=e1149] [cursor=pointer]: $0.00
+                    - generic [ref=e1150]:
+                      - generic [ref=e1151]: Spent
+                      - generic [ref=e1152]: $500.00
+                    - generic [ref=e1153]:
+                      - generic [ref=e1154]: Available
+                      - generic [ref=e1155]: "-$500.00"
+                    - button "✕" [ref=e1156] [cursor=pointer]
+                - generic [ref=e1158]:
+                  - generic [ref=e1159]:
+                    - generic [ref=e1160]: ⋮⋮
+                    - generic [ref=e1163]: Salary
+                  - generic [ref=e1164]:
+                    - generic [ref=e1165]:
+                      - generic [ref=e1166]: Allocated
+                      - generic "Click to edit" [ref=e1167] [cursor=pointer]: $0.00
+                    - generic [ref=e1168]:
+                      - generic [ref=e1169]: Spent
+                      - generic [ref=e1170]: "-$200.00"
+                    - generic [ref=e1171]:
+                      - generic [ref=e1172]: Available
+                      - generic [ref=e1173]: $200.00
+                    - button "✕" [ref=e1174] [cursor=pointer]
+              - button "+ Add Category" [ref=e1175] [cursor=pointer]
+          - generic [ref=e1176]:
+            - generic [ref=e1177] [cursor=pointer]:
+              - generic [ref=e1178]:
+                - generic [ref=e1179]: ▼
+                - generic "Drag to reorder" [ref=e1180]: ⋮⋮
+                - heading "Test Categories" [level=3] [ref=e1181]:
+                  - generic "Click to edit group name" [ref=e1182]: Test Categories
+              - button "✕" [ref=e1184]
+            - generic [ref=e1185]:
+              - generic [ref=e1186]:
+                - generic [ref=e1188]:
+                  - generic [ref=e1189]:
+                    - generic [ref=e1190]: ⋮⋮
+                    - generic [ref=e1193]: Gas
+                  - generic [ref=e1194]:
+                    - generic [ref=e1195]:
+                      - generic [ref=e1196]: Allocated
+                      - generic "Click to edit" [ref=e1197] [cursor=pointer]: $0.00
+                    - generic [ref=e1198]:
+                      - generic [ref=e1199]: Spent
+                      - generic [ref=e1200]: $400.00
+                    - generic [ref=e1201]:
+                      - generic [ref=e1202]: Available
+                      - generic [ref=e1203]: "-$400.00"
+                    - button "✕" [ref=e1204] [cursor=pointer]
+                - generic [ref=e1206]:
+                  - generic [ref=e1207]:
+                    - generic [ref=e1208]: ⋮⋮
+                    - generic [ref=e1211]: Groceries
+                  - generic [ref=e1212]:
+                    - generic [ref=e1213]:
+                      - generic [ref=e1214]: Allocated
+                      - generic "Click to edit" [ref=e1215] [cursor=pointer]: $0.00
+                    - generic [ref=e1216]:
+                      - generic [ref=e1217]: Spent
+                      - generic [ref=e1218]: $300.00
+                    - generic [ref=e1219]:
+                      - generic [ref=e1220]: Available
+                      - generic [ref=e1221]: "-$300.00"
+                    - button "✕" [ref=e1222] [cursor=pointer]
+                - generic [ref=e1224]:
+                  - generic [ref=e1225]:
+                    - generic [ref=e1226]: ⋮⋮
+                    - generic [ref=e1229]: Salary
+                  - generic [ref=e1230]:
+                    - generic [ref=e1231]:
+                      - generic [ref=e1232]: Allocated
+                      - generic "Click to edit" [ref=e1233] [cursor=pointer]: $0.00
+                    - generic [ref=e1234]:
+                      - generic [ref=e1235]: Spent
+                      - generic [ref=e1236]: "-$10,000.00"
+                    - generic [ref=e1237]:
+                      - generic [ref=e1238]: Available
+                      - generic [ref=e1239]: $10,000.00
+                    - button "✕" [ref=e1240] [cursor=pointer]
+              - button "+ Add Category" [ref=e1241] [cursor=pointer]
+          - generic [ref=e1242]:
+            - generic [ref=e1243] [cursor=pointer]:
+              - generic [ref=e1244]:
+                - generic [ref=e1245]: ▼
+                - generic "Drag to reorder" [ref=e1246]: ⋮⋮
+                - heading "Food & Dining" [level=3] [ref=e1247]:
+                  - generic "Click to edit group name" [ref=e1248]: Food & Dining
+              - button "✕" [ref=e1250]
+            - generic [ref=e1251]:
+              - generic [ref=e1252]:
+                - generic [ref=e1254]:
+                  - generic [ref=e1255]:
+                    - generic [ref=e1256]: ⋮⋮
+                    - generic [ref=e1259]: Groceries
+                  - generic [ref=e1260]:
+                    - generic [ref=e1261]:
+                      - generic [ref=e1262]: Allocated
+                      - generic "Click to edit" [ref=e1263] [cursor=pointer]: $50.00
+                    - generic [ref=e1264]:
+                      - generic [ref=e1265]: Spent
+                      - generic [ref=e1266]: $50.00
+                    - generic [ref=e1267]:
+                      - generic [ref=e1268]: Available
+                      - generic [ref=e1269]: $0.00
+                    - button "✕" [ref=e1270] [cursor=pointer]
+                - generic [ref=e1272]:
+                  - generic [ref=e1273]:
+                    - generic [ref=e1274]: ⋮⋮
+                    - generic [ref=e1277]: Restaurants
+                  - generic [ref=e1278]:
+                    - generic [ref=e1279]:
+                      - generic [ref=e1280]: Allocated
+                      - generic "Click to edit" [ref=e1281] [cursor=pointer]: $0.00
+                    - generic [ref=e1282]:
+                      - generic [ref=e1283]: Spent
+                      - generic [ref=e1284]: $0.00
+                    - generic [ref=e1285]:
+                      - generic [ref=e1286]: Available
+                      - generic [ref=e1287]: $0.00
+                    - button "✕" [ref=e1288] [cursor=pointer]
+              - button "+ Add Category" [ref=e1289] [cursor=pointer]
+          - generic [ref=e1290]:
+            - generic [ref=e1291] [cursor=pointer]:
+              - generic [ref=e1292]:
+                - generic [ref=e1293]: ▼
+                - generic "Drag to reorder" [ref=e1294]: ⋮⋮
+                - heading "Housing & Bills" [level=3] [ref=e1295]:
+                  - generic "Click to edit group name" [ref=e1296]: Housing & Bills
+              - button "✕" [ref=e1298]
+            - generic [ref=e1299]:
+              - generic [ref=e1300]:
+                - generic [ref=e1302]:
+                  - generic [ref=e1303]:
+                    - generic [ref=e1304]: ⋮⋮
+                    - generic [ref=e1307]: Phone
+                  - generic [ref=e1308]:
+                    - generic [ref=e1309]:
+                      - generic [ref=e1310]: Allocated
+                      - generic "Click to edit" [ref=e1311] [cursor=pointer]: $0.00
+                    - generic [ref=e1312]:
+                      - generic [ref=e1313]: Spent
+                      - generic [ref=e1314]: $0.00
+                    - generic [ref=e1315]:
+                      - generic [ref=e1316]: Available
+                      - generic [ref=e1317]: $0.00
+                    - button "✕" [ref=e1318] [cursor=pointer]
+                - generic [ref=e1320]:
+                  - generic [ref=e1321]:
+                    - generic [ref=e1322]: ⋮⋮
+                    - generic [ref=e1325]: Rent/Mortgage
+                  - generic [ref=e1326]:
+                    - generic [ref=e1327]:
+                      - generic [ref=e1328]: Allocated
+                      - generic "Click to edit" [ref=e1329] [cursor=pointer]: $0.00
+                    - generic [ref=e1330]:
+                      - generic [ref=e1331]: Spent
+                      - generic [ref=e1332]: $0.00
+                    - generic [ref=e1333]:
+                      - generic [ref=e1334]: Available
+                      - generic [ref=e1335]: $0.00
+                    - button "✕" [ref=e1336] [cursor=pointer]
+                - generic [ref=e1338]:
+                  - generic [ref=e1339]:
+                    - generic [ref=e1340]: ⋮⋮
+                    - generic [ref=e1343]: Utilities
+                  - generic [ref=e1344]:
+                    - generic [ref=e1345]:
+                      - generic [ref=e1346]: Allocated
+                      - generic "Click to edit" [ref=e1347] [cursor=pointer]: $0.00
+                    - generic [ref=e1348]:
+                      - generic [ref=e1349]: Spent
+                      - generic [ref=e1350]: $0.00
+                    - generic [ref=e1351]:
+                      - generic [ref=e1352]: Available
+                      - generic [ref=e1353]: $0.00
+                    - button "✕" [ref=e1354] [cursor=pointer]
+              - button "+ Add Category" [ref=e1355] [cursor=pointer]
+          - generic [ref=e1356]:
+            - generic [ref=e1357] [cursor=pointer]:
+              - generic [ref=e1358]:
+                - generic [ref=e1359]: ▼
+                - generic "Drag to reorder" [ref=e1360]: ⋮⋮
+                - heading "Transportation" [level=3] [ref=e1361]:
+                  - generic "Click to edit group name" [ref=e1362]: Transportation
+              - button "✕" [ref=e1364]
+            - generic [ref=e1365]:
+              - generic [ref=e1366]:
+                - generic [ref=e1368]:
+                  - generic [ref=e1369]:
+                    - generic [ref=e1370]: ⋮⋮
+                    - generic [ref=e1373]: Car Payment & Insurance
+                  - generic [ref=e1374]:
+                    - generic [ref=e1375]:
+                      - generic [ref=e1376]: Allocated
+                      - generic "Click to edit" [ref=e1377] [cursor=pointer]: $100.00
+                    - generic [ref=e1378]:
+                      - generic [ref=e1379]: Spent
+                      - generic [ref=e1380]: $0.00
+                    - generic [ref=e1381]:
+                      - generic [ref=e1382]: Available
+                      - generic [ref=e1383]: $100.00
+                    - button "✕" [ref=e1384] [cursor=pointer]
+                - generic [ref=e1386]:
+                  - generic [ref=e1387]:
+                    - generic [ref=e1388]: ⋮⋮
+                    - generic [ref=e1391]: Gas/Fuel
+                  - generic [ref=e1392]:
+                    - generic [ref=e1393]:
+                      - generic [ref=e1394]: Allocated
+                      - generic "Click to edit" [ref=e1395] [cursor=pointer]: $0.00
+                    - generic [ref=e1396]:
+                      - generic [ref=e1397]: Spent
+                      - generic [ref=e1398]: $0.00
+                    - generic [ref=e1399]:
+                      - generic [ref=e1400]: Available
+                      - generic [ref=e1401]: $0.00
+                    - button "✕" [ref=e1402] [cursor=pointer]
+              - button "+ Add Category" [ref=e1403] [cursor=pointer]
+          - generic [ref=e1404]:
+            - generic [ref=e1405] [cursor=pointer]:
+              - generic [ref=e1406]:
+                - generic [ref=e1407]: ▼
+                - generic "Drag to reorder" [ref=e1408]: ⋮⋮
+                - heading "Personal & Lifestyle" [level=3] [ref=e1409]:
+                  - generic "Click to edit group name" [ref=e1410]: Personal & Lifestyle
+              - button "✕" [ref=e1412]
+            - generic [ref=e1413]:
+              - generic [ref=e1414]:
+                - generic [ref=e1416]:
+                  - generic [ref=e1417]:
+                    - generic [ref=e1418]: ⋮⋮
+                    - generic [ref=e1421]: Entertainment
+                  - generic [ref=e1422]:
+                    - generic [ref=e1423]:
+                      - generic [ref=e1424]: Allocated
+                      - generic "Click to edit" [ref=e1425] [cursor=pointer]: $0.00
+                    - generic [ref=e1426]:
+                      - generic [ref=e1427]: Spent
+                      - generic [ref=e1428]: $0.00
+                    - generic [ref=e1429]:
+                      - generic [ref=e1430]: Available
+                      - generic [ref=e1431]: $0.00
+                    - button "✕" [ref=e1432] [cursor=pointer]
+                - generic [ref=e1434]:
+                  - generic [ref=e1435]:
+                    - generic [ref=e1436]: ⋮⋮
+                    - generic [ref=e1439]: Shopping
+                  - generic [ref=e1440]:
+                    - generic [ref=e1441]:
+                      - generic [ref=e1442]: Allocated
+                      - generic "Click to edit" [ref=e1443] [cursor=pointer]: $0.00
+                    - generic [ref=e1444]:
+                      - generic [ref=e1445]: Spent
+                      - generic [ref=e1446]: $0.00
+                    - generic [ref=e1447]:
+                      - generic [ref=e1448]: Available
+                      - generic [ref=e1449]: $0.00
+                    - button "✕" [ref=e1450] [cursor=pointer]
+              - button "+ Add Category" [ref=e1451] [cursor=pointer]
+          - generic [ref=e1452]:
+            - generic [ref=e1453] [cursor=pointer]:
+              - generic [ref=e1454]:
+                - generic [ref=e1455]: ▼
+                - generic "Drag to reorder" [ref=e1456]: ⋮⋮
+                - heading "Other" [level=3] [ref=e1457]:
+                  - generic "Click to edit group name" [ref=e1458]: Other
+              - button "✕" [ref=e1460]
+            - generic [ref=e1461]:
+              - generic [ref=e1464]:
+                - generic [ref=e1465]:
+                  - generic [ref=e1466]: ⋮⋮
+                  - generic [ref=e1469]: Miscellaneous
+                - generic [ref=e1470]:
+                  - generic [ref=e1471]:
+                    - generic [ref=e1472]: Allocated
+                    - generic "Click to edit" [ref=e1473] [cursor=pointer]: $0.00
+                  - generic [ref=e1474]:
+                    - generic [ref=e1475]: Spent
+                    - generic [ref=e1476]: $0.00
+                  - generic [ref=e1477]:
+                    - generic [ref=e1478]: Available
+                    - generic [ref=e1479]: $0.00
+                  - button "✕" [ref=e1480] [cursor=pointer]
+              - button "+ Add Category" [ref=e1481] [cursor=pointer]
+  - generic [ref=e1483]:
+    - generic [ref=e1484]:
+      - heading "Transactions" [level=2] [ref=e1485]
+      - paragraph
+    - button "×" [ref=e1486] [cursor=pointer]
+```

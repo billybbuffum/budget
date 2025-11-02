@@ -374,8 +374,19 @@ func TestAllocationService_AllocateToCoverUnderfunded_Success(t *testing.T) {
 	budgetStateRepo := newMockBudgetStateRepository(100000, 50000) // $1000 balance, $500 RTA
 	accountRepo := newMockAccountRepository(100000)
 
-	// Create payment category
+	// Create credit card account with $200 debt
 	accountID := "credit-card-account-id"
+	creditCardAccount := &domain.Account{
+		ID:        accountID,
+		Name:      "Test Credit Card",
+		Type:      "credit",
+		Balance:   -20000, // Owe $200
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	accountRepo.accounts[accountID] = creditCardAccount
+
+	// Create payment category
 	paymentCategoryID := "payment-category-id"
 	paymentCategory := &domain.Category{
 		ID:                  paymentCategoryID,
@@ -398,6 +409,41 @@ func TestAllocationService_AllocateToCoverUnderfunded_Success(t *testing.T) {
 
 	// Simulate $200 spent on credit card (underfunded)
 	transactionRepo.categoryActivityResult = 20000 // $200 in cents
+
+	// Add income transaction to provide RTA
+	incomeCategoryID := "income-category-id"
+	incomeCategory := &domain.Category{
+		ID:        incomeCategoryID,
+		Name:      "Salary",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[incomeCategoryID] = incomeCategory
+
+	incomeTransaction := &domain.Transaction{
+		ID:          "income-txn-id",
+		AccountID:   "checking-account-id",
+		CategoryID:  &incomeCategoryID,
+		Amount:      20000, // $200 income
+		Description: "Salary",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, incomeTransaction)
+
+	// Add credit card spending transaction
+	ccTransaction := &domain.Transaction{
+		ID:          "cc-txn-id",
+		AccountID:   accountID,
+		CategoryID:  &regularCategoryID,
+		Amount:      -20000, // $200 spending
+		Description: "Groceries",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, ccTransaction)
 
 	service := NewAllocationService(
 		allocationRepo,
@@ -468,8 +514,8 @@ func TestAllocationService_AllocateToCoverUnderfunded_CategoryNotFound(t *testin
 		t.Fatal("AllocateToCoverUnderfunded() expected error, got nil")
 	}
 
-	if err.Error() != "payment category not found" {
-		t.Errorf("AllocateToCoverUnderfunded() error = %v, want 'payment category not found'", err)
+	if err.Error() != "category not found" {
+		t.Errorf("AllocateToCoverUnderfunded() error = %v, want 'category not found'", err)
 	}
 
 	if allocation != nil {
@@ -610,8 +656,19 @@ func TestAllocationService_AllocateToCoverUnderfunded_InsufficientFunds(t *testi
 	budgetStateRepo := newMockBudgetStateRepository(100000, 10000) // Only $100 RTA
 	accountRepo := newMockAccountRepository(100000)
 
-	// Create payment category
+	// Create credit card account with $500 debt
 	accountID := "credit-card-account-id"
+	creditCardAccount := &domain.Account{
+		ID:        accountID,
+		Name:      "Test Credit Card",
+		Type:      "credit",
+		Balance:   -50000, // Owe $500
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	accountRepo.accounts[accountID] = creditCardAccount
+
+	// Create payment category
 	paymentCategoryID := "payment-category-id"
 	paymentCategory := &domain.Category{
 		ID:                  paymentCategoryID,
@@ -624,6 +681,28 @@ func TestAllocationService_AllocateToCoverUnderfunded_InsufficientFunds(t *testi
 
 	// Simulate $500 spent (underfunded = $500)
 	transactionRepo.categoryActivityResult = 50000 // $500 in cents
+
+	// Add income transaction - only $100, insufficient for $500 underfunded
+	incomeCategoryID := "income-category-id"
+	incomeCategory := &domain.Category{
+		ID:        incomeCategoryID,
+		Name:      "Salary",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[incomeCategoryID] = incomeCategory
+
+	incomeTransaction := &domain.Transaction{
+		ID:          "income-txn-id",
+		AccountID:   "checking-account-id",
+		CategoryID:  &incomeCategoryID,
+		Amount:      10000, // Only $100 income (insufficient)
+		Description: "Salary",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, incomeTransaction)
 
 	service := NewAllocationService(
 		allocationRepo,
@@ -645,9 +724,9 @@ func TestAllocationService_AllocateToCoverUnderfunded_InsufficientFunds(t *testi
 		t.Fatal("AllocateToCoverUnderfunded() expected error, got nil")
 	}
 
-	expectedErrPrefix := "insufficient funds: Ready to Assign: $1.00, Underfunded: $5.00"
-	if err.Error() != expectedErrPrefix {
-		t.Errorf("AllocateToCoverUnderfunded() error = %v, want error starting with '%s'", err, expectedErrPrefix)
+	expectedErrMsg := "insufficient funds in Ready to Assign: Ready to Assign: $100.00, Underfunded: $500.00"
+	if err.Error() != expectedErrMsg {
+		t.Errorf("AllocateToCoverUnderfunded() error = %v, want '%s'", err, expectedErrMsg)
 	}
 
 	if allocation != nil {
@@ -667,8 +746,19 @@ func TestAllocationService_AllocateToCoverUnderfunded_UpsertBehavior(t *testing.
 	budgetStateRepo := newMockBudgetStateRepository(100000, 50000) // $1000 balance, $500 RTA
 	accountRepo := newMockAccountRepository(100000)
 
-	// Create payment category
+	// Create credit card account with $150 debt
 	accountID := "credit-card-account-id"
+	creditCardAccount := &domain.Account{
+		ID:        accountID,
+		Name:      "Test Credit Card",
+		Type:      "credit",
+		Balance:   -15000, // Owe $150
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	accountRepo.accounts[accountID] = creditCardAccount
+
+	// Create payment category
 	paymentCategoryID := "payment-category-id"
 	paymentCategory := &domain.Category{
 		ID:                  paymentCategoryID,
@@ -679,7 +769,17 @@ func TestAllocationService_AllocateToCoverUnderfunded_UpsertBehavior(t *testing.
 	}
 	categoryRepo.categories[paymentCategoryID] = paymentCategory
 
-	// Create existing allocation of $100
+	// Create regular category for spending
+	regularCategoryID := "regular-category-id"
+	regularCategory := &domain.Category{
+		ID:        regularCategoryID,
+		Name:      "Groceries",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[regularCategoryID] = regularCategory
+
+	// Create existing allocation of $100 to payment category
 	existingAllocation := &domain.Allocation{
 		ID:         "existing-allocation-id",
 		CategoryID: paymentCategoryID,
@@ -692,8 +792,43 @@ func TestAllocationService_AllocateToCoverUnderfunded_UpsertBehavior(t *testing.
 	key := fmt.Sprintf("%s:%s", existingAllocation.CategoryID, existingAllocation.Period)
 	allocationRepo.categoryPeriodMap[key] = existingAllocation
 
-	// Simulate $150 spent (underfunded = $50)
+	// Simulate $150 spent (underfunded = $50 because $100 already allocated)
 	transactionRepo.categoryActivityResult = 15000 // $150 in cents
+
+	// Add income transaction - $150 to cover existing $100 allocation + $50 underfunded
+	incomeCategoryID := "income-category-id"
+	incomeCategory := &domain.Category{
+		ID:        incomeCategoryID,
+		Name:      "Salary",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[incomeCategoryID] = incomeCategory
+
+	incomeTransaction := &domain.Transaction{
+		ID:          "income-txn-id",
+		AccountID:   "checking-account-id",
+		CategoryID:  &incomeCategoryID,
+		Amount:      15000, // $150 income
+		Description: "Salary",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, incomeTransaction)
+
+	// Add credit card spending transaction
+	ccTransaction := &domain.Transaction{
+		ID:          "cc-txn-id",
+		AccountID:   accountID,
+		CategoryID:  &regularCategoryID,
+		Amount:      -15000, // $150 spending
+		Description: "Groceries",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, ccTransaction)
 
 	service := NewAllocationService(
 		allocationRepo,
@@ -750,8 +885,19 @@ func TestAllocationService_AllocateToCoverUnderfunded_ExactlyEnoughFunds(t *test
 	budgetStateRepo := newMockBudgetStateRepository(100000, 20000) // Exactly $200 RTA
 	accountRepo := newMockAccountRepository(100000)
 
-	// Create payment category
+	// Create credit card account with $200 debt
 	accountID := "credit-card-account-id"
+	creditCardAccount := &domain.Account{
+		ID:        accountID,
+		Name:      "Test Credit Card",
+		Type:      "credit",
+		Balance:   -20000, // Owe $200
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	accountRepo.accounts[accountID] = creditCardAccount
+
+	// Create payment category
 	paymentCategoryID := "payment-category-id"
 	paymentCategory := &domain.Category{
 		ID:                  paymentCategoryID,
@@ -762,8 +908,53 @@ func TestAllocationService_AllocateToCoverUnderfunded_ExactlyEnoughFunds(t *test
 	}
 	categoryRepo.categories[paymentCategoryID] = paymentCategory
 
+	// Create regular category for spending
+	regularCategoryID := "regular-category-id"
+	regularCategory := &domain.Category{
+		ID:        regularCategoryID,
+		Name:      "Groceries",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[regularCategoryID] = regularCategory
+
 	// Simulate exactly $200 spent (underfunded = $200, exactly matches RTA)
 	transactionRepo.categoryActivityResult = 20000 // $200 in cents
+
+	// Add income transaction - exactly $200 to match underfunded amount
+	incomeCategoryID := "income-category-id"
+	incomeCategory := &domain.Category{
+		ID:        incomeCategoryID,
+		Name:      "Salary",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	categoryRepo.categories[incomeCategoryID] = incomeCategory
+
+	incomeTransaction := &domain.Transaction{
+		ID:          "income-txn-id",
+		AccountID:   "checking-account-id",
+		CategoryID:  &incomeCategoryID,
+		Amount:      20000, // Exactly $200 income
+		Description: "Salary",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, incomeTransaction)
+
+	// Add credit card spending transaction
+	ccTransaction := &domain.Transaction{
+		ID:          "cc-txn-id",
+		AccountID:   accountID,
+		CategoryID:  &regularCategoryID,
+		Amount:      -20000, // $200 spending
+		Description: "Groceries",
+		Date:        time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	transactionRepo.transactions = append(transactionRepo.transactions, ccTransaction)
 
 	service := NewAllocationService(
 		allocationRepo,
