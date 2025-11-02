@@ -22,6 +22,51 @@ The `/bootstrap-claude-code` command works in two modes and automatically genera
 ✅ **MCP Recommendations** - Suggested MCP servers for the tech stack
 ✅ **Documentation** - README, FEATURE_USAGE_GUIDE, and WORKFLOWS
 
+## 🔬 New: Domain Research for Accuracy!
+
+The command now includes **automatic domain research** for specialized fields!
+
+**How it works:**
+1. **Assesses domain complexity** - Healthcare, fintech, legal? → Research required
+2. **Conducts web research** - Searches for formulas, regulations, best practices
+3. **Validates knowledge** - Ensures domain experts have accurate, researched information
+
+**What gets researched:**
+- ✅ Domain-specific formulas and calculations (ovulation prediction, interest calculations, etc.)
+- ✅ Regulatory requirements (HIPAA, PCI-DSS, GDPR, FDA, SOC 2, etc.)
+- ✅ Normal ranges and validation rules (cycle lengths, temperature ranges, price limits, etc.)
+- ✅ Industry best practices and common mistakes
+- ✅ Security requirements for the domain
+
+**Example: Ovulation Tracker App**
+```
+Domain detected: Healthcare/Fertility tracking → Research required
+
+Web searches conducted:
+1. "ovulation prediction methods calendar BBT cervical mucus"
+2. "menstrual cycle normal ranges cycle length period duration"
+3. "HIPAA compliance health app protected health information"
+4. "basal body temperature normal range ovulation"
+5. "fertility tracking prediction accuracy"
+
+Result: Domain expert agent includes:
+- Accurate ovulation formulas (next_period - 14 days)
+- Clinical validation rules (cycle length 21-35 days)
+- HIPAA compliance requirements (encryption, consent, access logs)
+- BBT temperature ranges (97.0-99.0°F normal)
+- Prediction confidence calculations (based on cycle regularity)
+```
+
+**Domains that trigger research:**
+- Healthcare/Medical (HIPAA, medical accuracy)
+- Fintech/Banking (regulations, money handling)
+- Legal (compliance, regulations)
+- E-commerce (advanced: taxes, shipping, inventory)
+- SaaS (multi-tenancy, billing)
+- And any specialized domain requiring regulatory compliance
+
+This ensures your domain expert agents are **accurate and production-ready**, not just based on general knowledge!
+
 ## Making It Available Globally (User-Level)
 
 To use this command across all your projects, move it to your user-level Claude Code configuration:

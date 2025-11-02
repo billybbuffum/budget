@@ -109,9 +109,9 @@ Let me ask a few questions to generate the best configuration:
 - State management: Redux/Zustand/Context
 - Navigation: React Navigation
 
-### 1.4 Skip to Phase 2 (Generation)
+### 1.4 Proceed to Domain Research
 
-With requirements gathered, proceed directly to **Phase 2** to generate configuration.
+With requirements gathered, proceed to **Phase 1.5** for domain research.
 
 ---
 
@@ -171,6 +171,317 @@ tree -L 3 -I 'node_modules|vendor|venv' || ls -R | head -150
 - Look for code quality tools (linters, formatters)
 - Identify deployment practices
 - Check for existing documentation generation
+
+---
+
+## Phase 1.5: Domain Research and Validation
+
+**CRITICAL: This phase ensures domain expert agents have accurate, well-researched knowledge.**
+
+### 1.5.1 Assess Domain Complexity
+
+**Categorize the domain:**
+
+**High Confidence Domains (General knowledge sufficient):**
+- Todo/Task Management
+- Blog/CMS
+- Social Media
+- E-commerce (basic concepts)
+- Weather Apps
+- Note Taking
+- File Management
+
+**Medium Confidence Domains (Research recommended):**
+- E-commerce (advanced: inventory, taxes, shipping)
+- SaaS (multi-tenancy, billing, subscriptions)
+- Real Estate
+- Education/LMS
+- Restaurant/Food Delivery
+- Travel/Booking
+- HR/Recruitment
+
+**Low Confidence Domains (Research REQUIRED):**
+- **Healthcare/Medical** (HIPAA, medical accuracy, clinical data)
+- **Fintech/Banking** (regulations, accounting, money handling)
+- **Legal** (compliance, regulations, legal accuracy)
+- **Scientific** (formulas, methodologies, peer-reviewed concepts)
+- **Insurance** (actuarial concepts, regulations)
+- **Cryptocurrency** (blockchain, consensus, security)
+- **Aviation** (FAA regulations, safety)
+- **Automotive** (safety standards, regulations)
+- **Specialized domains** (fertility tracking, nutrition, mental health, etc.)
+
+### 1.5.2 Determine Research Needs
+
+**For each domain, determine what needs research:**
+
+**Always research:**
+- Regulatory/compliance requirements (HIPAA, PCI-DSS, GDPR, SOC 2, etc.)
+- Industry-specific calculations and formulas
+- Data validation rules and ranges
+- Security best practices for the domain
+- Common mistakes and anti-patterns
+
+**Domain-specific research needs:**
+
+**Healthcare/Medical (e.g., ovulation tracking):**
+```
+Research topics:
+- Medical accuracy of formulas (ovulation prediction methods)
+- Normal ranges (BBT temperature ranges, cycle lengths)
+- HIPAA compliance requirements for PHI
+- FDA regulations (if medical device classification)
+- Clinical validation standards
+- Privacy requirements (consent, data export, deletion)
+```
+
+**Fintech/Banking (e.g., budgeting app):**
+```
+Research topics:
+- Accounting standards (double-entry bookkeeping, GAAP)
+- Money handling (avoid floating point, currency precision)
+- Regulatory compliance (KYC, AML, bank secrecy act)
+- Transaction consistency (ACID properties, idempotency)
+- PCI-DSS compliance (if handling payments)
+- Audit trail requirements
+```
+
+**E-commerce (e.g., online store):**
+```
+Research topics:
+- Inventory management (stock levels, reservations, backorders)
+- Tax calculations (sales tax, VAT, nexus rules)
+- Shipping calculations (dimensional weight, zones)
+- Payment processing (PCI-DSS, fraud detection)
+- Refund policies and handling
+- International commerce (customs, duties)
+```
+
+**SaaS (e.g., project management):**
+```
+Research topics:
+- Multi-tenancy data isolation patterns
+- Subscription billing (proration, upgrades, cancellations)
+- Usage-based pricing calculations
+- Tenant onboarding workflows
+- Feature flags and gradual rollout
+- SOC 2 compliance requirements
+```
+
+### 1.5.3 Conduct Domain Research (Use WebSearch)
+
+**For Medium and Low Confidence domains, use WebSearch to research:**
+
+**Example research queries:**
+
+**For ovulation tracking app:**
+```
+Query 1: "ovulation prediction methods calendar method BBT cervical mucus"
+→ Learn: Calendar method (ovulation = period - 14 days), BBT method (temperature rise), mucus method
+
+Query 2: "menstrual cycle normal ranges cycle length period duration"
+→ Learn: Cycle length 21-35 days normal, period 3-7 days typical, variations to flag
+
+Query 3: "HIPAA compliance health app menstrual data protected health information"
+→ Learn: PHI definition, encryption requirements, access logs, consent, right to export/delete
+
+Query 4: "basal body temperature normal range ovulation"
+→ Learn: Pre-ovulation 97.0-97.5°F, post-ovulation 97.6-98.6°F, 0.5-1°F rise indicates ovulation
+
+Query 5: "ovulation prediction accuracy fertile window calculation"
+→ Learn: Fertile window is 5 days before + day of ovulation, need 3+ cycles for predictions, 6+ for accuracy
+```
+
+**For zero-based budgeting app:**
+```
+Query 1: "zero-based budgeting methodology YNAB envelope budgeting"
+→ Learn: Core principles, Ready to Assign concept, category allocation, rollover behavior
+
+Query 2: "money storage best practices database cents vs dollars floating point"
+→ Learn: Store as integers (cents), avoid floating point, currency precision requirements
+
+Query 3: "double-entry bookkeeping accounting basics debit credit"
+→ Learn: Every transaction has two sides, account balance calculations, reconciliation
+
+Query 4: "financial data security encryption at rest in transit"
+→ Learn: Encryption requirements, secure storage, access controls, audit trails
+
+Query 5: "budgeting app data model categories accounts transactions"
+→ Learn: Common patterns, relationships, balance calculations, transaction categorization
+```
+
+**For healthcare app:**
+```
+Query 1: "{specific health domain} medical accuracy guidelines"
+Query 2: "HIPAA compliance requirements health apps"
+Query 3: "FDA medical device classification mobile health apps"
+Query 4: "{clinical concept} normal ranges clinical validation"
+Query 5: "health data privacy GDPR special category data"
+```
+
+**For fintech app:**
+```
+Query 1: "PCI-DSS compliance requirements payment data"
+Query 2: "financial regulations KYC AML requirements"
+Query 3: "money handling best practices currency precision"
+Query 4: "transaction consistency ACID properties idempotency"
+Query 5: "financial audit trail requirements"
+```
+
+### 1.5.4 Synthesize Research Findings
+
+**Create domain knowledge summary:**
+
+**For each researched topic, document:**
+- **Key concepts and terminology**
+- **Formulas and calculations** (with sources if possible)
+- **Validation rules** (ranges, constraints, edge cases)
+- **Regulatory requirements** (HIPAA, PCI-DSS, GDPR, etc.)
+- **Best practices** (industry standards, common patterns)
+- **Common mistakes** (anti-patterns, pitfalls)
+- **Testing considerations** (accuracy validation, compliance checks)
+
+**Example synthesis for ovulation tracking:**
+
+```markdown
+## Ovulation Tracking Domain Knowledge (Researched)
+
+### Core Concepts
+- **Menstrual Cycle:** Typically 21-35 days (28-day average)
+- **Ovulation:** Egg release, typically 14 days before next period
+- **Fertile Window:** 5 days before + day of ovulation (6 days total)
+- **Cycle Phases:** Menstrual (days 1-5), Follicular (days 1-13), Ovulation (day 14), Luteal (days 15-28)
+
+### Prediction Methods (Researched)
+1. **Calendar Method:** next_ovulation = next_period_start - 14 days
+2. **BBT Method:** Temperature rise of 0.5-1°F indicates ovulation occurred
+3. **Cervical Mucus Method:** Clear, stretchy "egg-white" mucus indicates peak fertility
+4. **Symptom-Thermal Method:** Combines multiple indicators for higher accuracy
+
+### Validation Rules (Evidence-based)
+- Cycle length: 21-35 days (flag if outside range)
+- Period duration: 3-7 days typical (flag if <2 or >8)
+- BBT range: 97.0-99.0°F normal (36.1-37.2°C)
+- Pre-ovulation BBT: 97.0-97.5°F
+- Post-ovulation BBT: 97.6-98.6°F
+- Minimum data for predictions: 3 cycles (recommend 6+ for accuracy)
+
+### Regulatory Requirements (Researched)
+- **HIPAA:** Menstrual data is Protected Health Information (PHI)
+  - Encryption at rest and in transit required
+  - Access logs required
+  - User consent for collection
+  - Right to data export and deletion
+- **GDPR:** Health data is "special category" personal data
+  - Explicit consent required
+  - Purpose limitation
+  - Data minimization
+  - Right to erasure
+- **FDA:** May be regulated as medical device if makes diagnostic claims
+
+### Formulas (Validated)
+```
+average_cycle_length = sum(last_6_cycles) / 6
+next_period_date = last_period_start + average_cycle_length
+next_ovulation_date = next_period_date - 14 days
+fertile_window_start = next_ovulation_date - 5 days
+fertile_window_end = next_ovulation_date
+
+prediction_confidence:
+  - std_dev ≤ 2 days: High confidence
+  - std_dev 3-4 days: Medium confidence
+  - std_dev > 4 days: Low confidence
+```
+
+### Common Mistakes (Industry knowledge)
+❌ Using floating-point for cycle day calculations
+❌ Assuming 28-day cycles for everyone
+❌ Hard-coding ovulation as "day 14" (doesn't work for irregular cycles)
+❌ Storing health data without encryption
+❌ Making predictions without sufficient data (need 3+ cycles minimum)
+
+### Testing Checklist
+- [ ] Validate cycle length boundaries (21-35 days)
+- [ ] Test irregular cycle handling
+- [ ] Verify prediction accuracy with real-world data
+- [ ] Test HIPAA compliance (encryption, access logs, consent)
+- [ ] Validate BBT temperature ranges
+- [ ] Test prediction confidence calculations
+- [ ] Verify data export/deletion functionality
+```
+
+### 1.5.5 Validate Existing Code (Mode 2 Only)
+
+**If analyzing existing project, validate findings against researched knowledge:**
+
+Compare:
+- **Code formulas** vs **Researched formulas** (identify discrepancies)
+- **Validation rules** in code vs **Industry standards** (flag missing validations)
+- **Security measures** vs **Regulatory requirements** (identify gaps)
+- **Data models** vs **Best practices** (suggest improvements)
+
+**Report findings:**
+```
+Domain Analysis Report:
+✅ Core formulas match industry standards
+⚠️  Missing cycle length validation (should flag <21 or >35 days)
+❌ HIPAA: No encryption at rest detected
+✅ Prediction algorithm uses 6-cycle average (best practice)
+⚠️  No prediction confidence calculation
+```
+
+### 1.5.6 Update Domain Profile with Research
+
+**Enhance domain profile with researched knowledge:**
+
+**Before research:**
+```
+Domain: Ovulation tracking
+Key concepts: Cycles, ovulation, predictions
+```
+
+**After research:**
+```
+Domain: Ovulation and fertility tracking
+Subdomain: Women's health, reproductive health
+Key Concepts:
+  - Menstrual cycle phases (menstrual, follicular, ovulation, luteal)
+  - Ovulation prediction (calendar, BBT, cervical mucus, symptom-thermal methods)
+  - Fertile window (5 days before + day of ovulation)
+  - Basal Body Temperature (BBT) tracking
+  - Cycle regularity and prediction confidence
+
+Formulas (Evidence-based):
+  - Ovulation date: next_period - 14 days
+  - Fertile window: ovulation_date - 5 to ovulation_date
+  - Average cycle length: mean of last 6 cycles
+  - Prediction confidence: based on standard deviation of cycle lengths
+
+Validation Rules (Clinical):
+  - Cycle length: 21-35 days normal
+  - Period duration: 3-7 days typical
+  - BBT range: 97.0-99.0°F
+  - Minimum 3 cycles for predictions (6+ recommended)
+
+Regulatory (Compliance):
+  - HIPAA: PHI protection, encryption, access logs, consent, export/deletion rights
+  - GDPR: Special category data, explicit consent, purpose limitation
+  - FDA: Potential medical device classification if diagnostic claims
+
+Security Requirements:
+  - Encryption at rest (AES-256)
+  - Encryption in transit (TLS 1.2+)
+  - Access logging and audit trails
+  - User consent management
+  - Data export (machine-readable format)
+  - Data deletion (complete erasure)
+
+Testing Requirements:
+  - Prediction accuracy validation with real-world cycle data
+  - Edge case testing (irregular cycles, first cycle, very short/long cycles)
+  - Compliance testing (HIPAA, GDPR)
+  - Security testing (encryption, access controls)
+```
 
 ---
 
@@ -1077,31 +1388,39 @@ Before starting generation, create todo list:
 4. Determine tech stack profile
 5. Determine domain profile
 6. Determine architecture profile
-7. Create code-reviewer agent for {language}/{framework}
-8. Create test-generator agent for {testing framework}
-9. Create security-auditor agent with {domain} focus
-10. Create refactoring-assistant agent
-11. Create documentation-generator agent
-12. Create {domain}-expert agent with domain knowledge
-13. Create [conditional agents based on tech stack]
-14. Create /create-spec command
-15. Create /implement-spec command
-16. Create /new-feature command
-17. Create /review-pr command
-18. Create /run-tests command for {test framework}
-19. Create /test-ui command for {platform}
-20. Create [tech-stack specific commands]
-21. Create {architecture}-architecture skill
-22. Create {domain} skill with domain knowledge
-23. Create {language}-testing skill
-24. Create [framework/database skills]
-25. Create MCP_RECOMMENDATIONS.md with {tech stack} MCPs
-26. Create README.md with project overview
-27. Create FEATURE_USAGE_GUIDE.md
-28. Create WORKFLOWS.md with {project type} workflows
-29. [Optional] Scaffold initial project structure
-30. Validate all generated files
-31. Commit and push changes
+7. Assess domain complexity (High/Medium/Low confidence)
+8. Conduct domain research (WebSearch for Medium/Low confidence domains)
+9. Research regulatory requirements (HIPAA, PCI-DSS, GDPR, etc.)
+10. Research domain formulas and calculations
+11. Research validation rules and normal ranges
+12. Research industry best practices and common mistakes
+13. Synthesize research findings into domain knowledge summary
+14. Update domain profile with researched knowledge
+15. Create code-reviewer agent for {language}/{framework}
+16. Create test-generator agent for {testing framework}
+17. Create security-auditor agent with {domain} focus
+18. Create refactoring-assistant agent
+19. Create documentation-generator agent
+20. Create {domain}-expert agent with RESEARCHED domain knowledge
+21. Create [conditional agents based on tech stack]
+22. Create /create-spec command
+23. Create /implement-spec command
+24. Create /new-feature command
+25. Create /review-pr command
+26. Create /run-tests command for {test framework}
+27. Create /test-ui command for {platform}
+28. Create [tech-stack specific commands]
+29. Create {architecture}-architecture skill
+30. Create {domain} skill with RESEARCHED domain knowledge
+31. Create {language}-testing skill
+32. Create [framework/database skills]
+33. Create MCP_RECOMMENDATIONS.md with {tech stack} MCPs
+34. Create README.md with project overview
+35. Create FEATURE_USAGE_GUIDE.md
+36. Create WORKFLOWS.md with {project type} workflows
+37. [Optional] Scaffold initial project structure
+38. Validate all generated files
+39. Commit and push changes
 ```
 
 **For existing project mode:**
@@ -1110,7 +1429,14 @@ Before starting generation, create todo list:
 2. Identify tech stack from files
 3. Analyze domain from code/docs
 4. Identify architecture pattern
-5. [Continue with steps 7-31 from above]
+5. Assess domain complexity (High/Medium/Low confidence)
+6. Conduct domain research (WebSearch for Medium/Low confidence domains)
+7. Research regulatory requirements for domain
+8. Research domain formulas and best practices
+9. Validate existing code against researched knowledge (identify gaps)
+10. Generate domain analysis report (formulas match, missing validations, etc.)
+11. Update domain profile with researched knowledge
+12. [Continue with steps 15-39 from above]
 ```
 
 ### 8.2 Quality Standards
