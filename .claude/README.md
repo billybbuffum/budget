@@ -2,11 +2,14 @@
 
 This directory contains Claude Code customizations for the Budget application, including sub agents, slash commands, skills, and documentation.
 
+> 🎯 **Want to generate similar configuration for YOUR project?** See `/bootstrap-claude-code` command below and read [BOOTSTRAP_GUIDE.md](BOOTSTRAP_GUIDE.md) for instructions on automatically generating Claude Code setup for any project!
+
 ## 📁 Directory Structure
 
 ```
 .claude/
 ├── README.md                    # This file
+├── BOOTSTRAP_GUIDE.md          # 🎯 How to use /bootstrap-claude-code for any project
 ├── FEATURE_USAGE_GUIDE.md      # When to use each Claude Code feature
 ├── MCP_RECOMMENDATIONS.md       # Recommended MCP servers to install
 ├── WORKFLOWS.md                 # Common development workflows and examples
@@ -16,10 +19,13 @@ This directory contains Claude Code customizations for the Budget application, i
 │   ├── api-documenter/
 │   ├── refactoring-assistant/
 │   ├── security-auditor/
-│   └── budget-domain-expert/
+│   ├── budget-domain-expert/
+│   └── ui-tester/              # 🆕 Interactive UI testing
 ├── commands/                    # Slash commands for common workflows
+│   ├── bootstrap-claude-code.md # 🎯 Generate Claude Code config for any project
 │   ├── create-spec.md          # 🆕 Create validated specification
 │   ├── implement-spec.md       # 🆕 Orchestrate full spec implementation
+│   ├── test-ui.md              # 🆕 Interactive UI testing
 │   ├── new-feature.md
 │   ├── new-endpoint.md
 │   ├── review-pr.md
@@ -97,6 +103,16 @@ In conversation with Claude, reference agents like:
 Slash commands are reusable workflows for common tasks.
 
 ### Available Commands
+
+**Project Setup (Meta Command):**
+
+- **/bootstrap-claude-code** - 🎯 **Generate Claude Code configuration for any project**
+  - Analyzes project tech stack and domain
+  - Creates appropriate sub agents, slash commands, and skills
+  - Generates MCP recommendations
+  - Creates comprehensive documentation
+  - **Use this to set up Claude Code for a new project!**
+  - Can be moved to user-level config for global availability
 
 **Spec-Driven Development (Recommended Workflow):**
 
@@ -276,6 +292,31 @@ For complex tasks, use sub agents:
 Skills automatically activate based on context. Just work naturally and they'll help when relevant.
 
 ## 💡 Example Workflows
+
+### Bootstrap Claude Code for a New Project
+
+```
+# Step 1: Navigate to your new project
+cd ~/projects/my-new-saas-app
+
+# Step 2: Run the bootstrap command
+/bootstrap-claude-code
+
+→ Claude automatically:
+  1. Analyzes tech stack (languages, frameworks, tools)
+  2. Identifies business domain (e-commerce, fintech, etc.)
+  3. Generates 5-10 sub agents specific to your stack
+  4. Creates 6-12 slash commands for workflows
+  5. Generates skills for architecture and domain
+  6. Recommends MCPs for your tech stack
+  7. Creates comprehensive documentation
+
+# Step 3: Start using your new Claude Code setup!
+/create-spec "Add user authentication"
+
+→ Configuration generated in ~2-5 minutes!
+→ See BOOTSTRAP_GUIDE.md for details
+```
 
 ### Spec-Driven Development (Recommended)
 
