@@ -1,17 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 
-	"github.com/billybbuffum/budget/internal/application"
+	"github.com/billybbuffum/budget/internal/domain"
+	"github.com/billybbuffum/budget/internal/infrastructure/http/validators"
 )
 
-type AllocationHandler struct {
-	allocationService *application.AllocationService
+// AllocationServiceInterface defines the interface for allocation operations
+type AllocationServiceInterface interface {
+	CreateAllocation(ctx context.Context, categoryID string, amount int64, period, notes string) (*domain.Allocation, error)
+	GetAllocation(ctx context.Context, id string) (*domain.Allocation, error)
+	ListAllocations(ctx context.Context) ([]*domain.Allocation, error)
+	ListAllocationsByPeriod(ctx context.Context, period string) ([]*domain.Allocation, error)
+	DeleteAllocation(ctx context.Context, id string) error
+	GetAllocationSummary(ctx context.Context, period string) ([]*domain.AllocationSummary, error)
+	AllocateToCoverUnderfunded(ctx context.Context, paymentCategoryID string, period string) (*domain.Allocation, int64, error)
+	CalculateReadyToAssignForPeriod(ctx context.Context, period string) (int64, error)
 }
 
-func NewAllocationHandler(allocationService *application.AllocationService) *AllocationHandler {
+type AllocationHandler struct {
+	allocationService AllocationServiceInterface
+}
+
+func NewAllocationHandler(allocationService AllocationServiceInterface) *AllocationHandler {
 	return &AllocationHandler{
 		allocationService: allocationService,
 	}
@@ -144,4 +160,86 @@ func (h *AllocationHandler) DeleteAllocation(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// CoverUnderfundedRequest represents the request body for covering underfunded payment categories
+type CoverUnderfundedRequest struct {
+	PaymentCategoryID string `json:"payment_category_id"`
+	Period            string `json:"period"` // YYYY-MM
+}
+
+// CoverUnderfunded handles POST /api/allocations/cover-underfunded
+// Creates an allocation to cover an underfunded payment category
+func (h *AllocationHandler) CoverUnderfunded(w http.ResponseWriter, r *http.Request) {
+	var req CoverUnderfundedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("ERROR: Failed to decode request body: %v", err)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate UUID format
+	if err := validators.ValidateUUID(req.PaymentCategoryID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate period format and range
+	if err := validators.ValidatePeriodFormat(req.Period); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := validators.ValidatePeriodRange(req.Period); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Call service method to allocate to cover underfunded
+	allocation, underfundedAmount, err := h.allocationService.AllocateToCoverUnderfunded(
+		r.Context(),
+		req.PaymentCategoryID,
+		req.Period,
+	)
+
+	if err != nil {
+		// Log detailed error internally
+		log.Printf("ERROR: Failed to cover underfunded for category %s: %v", req.PaymentCategoryID, err)
+
+		// Use typed error checking for appropriate status codes
+		if errors.Is(err, domain.ErrCategoryNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		if errors.Is(err, domain.ErrNotPaymentCategory) ||
+			errors.Is(err, domain.ErrNotUnderfunded) ||
+			errors.Is(err, domain.ErrInsufficientFunds) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// For all other errors, return generic internal server error
+		http.Error(w, "Failed to process allocation request", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate Ready to Assign after the allocation
+	readyToAssignAfter, err := h.allocationService.CalculateReadyToAssignForPeriod(r.Context(), req.Period)
+	if err != nil {
+		log.Printf("WARNING: Failed to calculate Ready to Assign after allocation: %v", err)
+		// Continue with response even if RTA calculation fails
+		readyToAssignAfter = 0
+	}
+
+	// Prepare successful response
+	response := map[string]interface{}{
+		"allocation":            allocation,
+		"underfunded_amount":    underfundedAmount,
+		"ready_to_assign_after": readyToAssignAfter,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }

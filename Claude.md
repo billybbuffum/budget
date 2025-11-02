@@ -183,11 +183,18 @@ The core concept: Every dollar should be allocated to a category, leaving zero u
 
 ### Allocations
 - `POST /api/allocations` - Create/update allocation (upsert by category+period)
+- `POST /api/allocations/cover-underfunded` - Manually allocate to cover underfunded payment category
 - `GET /api/allocations` - List all allocations
 - `GET /api/allocations/summary?period=YYYY-MM` - Get allocation summary for period
 - `GET /api/allocations/ready-to-assign` - Get amount available to allocate
 - `GET /api/allocations/{id}` - Get allocation by ID
 - `DELETE /api/allocations/{id}` - Delete allocation
+
+**Note on Credit Card Payment Categories:**
+- Removed automatic retroactive syncing (was O(n²) complexity)
+- Real-time allocation occurs when credit card transactions are created
+- Use `/api/allocations/cover-underfunded` to manually cover underfunded payment categories
+- See `docs/API.md` and `docs/spec-remove-cc-sync.md` for details
 
 ## Database Schema
 

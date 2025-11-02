@@ -66,6 +66,7 @@ func NewRouter(
 
 	// Allocation routes
 	mux.HandleFunc("POST /api/allocations", allocationHandler.CreateAllocation)
+	mux.HandleFunc("POST /api/allocations/cover-underfunded", allocationHandler.CoverUnderfunded)
 	mux.HandleFunc("GET /api/allocations", allocationHandler.ListAllocations)
 	mux.HandleFunc("GET /api/allocations/summary", allocationHandler.GetAllocationSummary)
 	mux.HandleFunc("GET /api/allocations/ready-to-assign", allocationHandler.GetReadyToAssign)
