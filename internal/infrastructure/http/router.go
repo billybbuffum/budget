@@ -14,6 +14,7 @@ func NewRouter(
 	transactionHandler *handlers.TransactionHandler,
 	allocationHandler *handlers.AllocationHandler,
 	importHandler *handlers.ImportHandler,
+	transferSuggestionHandler *handlers.TransferSuggestionHandler,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -72,6 +73,13 @@ func NewRouter(
 	mux.HandleFunc("GET /api/allocations/ready-to-assign", allocationHandler.GetReadyToAssign)
 	mux.HandleFunc("GET /api/allocations/{id}", allocationHandler.GetAllocation)
 	mux.HandleFunc("DELETE /api/allocations/{id}", allocationHandler.DeleteAllocation)
+
+	// Transfer suggestion routes
+	mux.HandleFunc("GET /api/transfer-suggestions/pending", transferSuggestionHandler.ListPendingSuggestions)
+	mux.HandleFunc("GET /api/transfer-suggestions", transferSuggestionHandler.ListAllSuggestions)
+	mux.HandleFunc("POST /api/transfer-suggestions/{id}/accept", transferSuggestionHandler.AcceptSuggestion)
+	mux.HandleFunc("POST /api/transfer-suggestions/{id}/reject", transferSuggestionHandler.RejectSuggestion)
+	mux.HandleFunc("POST /api/transactions/link", transferSuggestionHandler.ManualLink)
 
 	return mux
 }
